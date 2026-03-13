@@ -144,7 +144,7 @@
         <button class="nav-item"        onclick="showSection('headcount',this)">💰 &nbsp;Headcount</button>
         <button class="nav-item" onclick="showSection('absenteismo',this)">📋 &nbsp;Absenteísmo</button>
         <button class="nav-item" onclick="showSection('rotatividade',this)">🔄 &nbsp;Rotatividade</button>
-        <button class="nav-item" disabled>🎯 &nbsp;Recrutamento</button>
+        <button class="nav-item" onclick="showSection('recrutamento',this)">🎯 &nbsp;Recrutamento</button>
         <button class="nav-item" disabled>📚 &nbsp;Treinamentos</button>
         <button class="nav-item" disabled>💬 &nbsp;e-NPS</button>
         <button class="nav-item" disabled>⭐ &nbsp;e-SAT</button>
@@ -262,6 +262,41 @@
           </div>
         </div>
         <div id="rotTableWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
+
+    <section class="page-section" id="sec-recrutamento">
+      <div class="page-header"><h1>Recrutamento e Seleção</h1></div>
+      <div class="kpi-grid" id="recKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Processos por Mês</span></div>
+          <canvas id="chartRecMes" height="160"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Funil de Seleção</span></div>
+          <canvas id="chartRecFunil" height="160"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Processos Seletivos</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input class="search-bar" type="text" id="recSearch" placeholder="Buscar vaga..." oninput="filterRec()">
+            <select class="form-select" id="recFiltroSit" onchange="filterRec()" style="width:auto;padding:8px 12px;font-size:13px">
+              <option value="">Todos</option>
+              <option value="Finalizado">Finalizados</option>
+              <option value="Cancelado">Cancelados</option>
+              <option value="Em andamento">Em andamento</option>
+            </select>
+            <button class="btn btn-outline" onclick="document.getElementById('recExcelInput').click()">📥 Importar Excel</button>
+            <input type="file" id="recExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importRecExcel(this)">
+            <button class="btn btn-primary" onclick="openRecModal()">+ Novo Processo</button>
+          </div>
+        </div>
+        <div id="recTableWrap"><div class="empty-state">Carregando...</div></div>
       </div>
     </section>
   </main>
@@ -390,6 +425,89 @@
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeAbsModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveAbs()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RECRUTAMENTO -->
+<div class="modal-overlay" id="recModal">
+  <div class="modal" style="width:680px">
+    <div class="modal-header">
+      <span class="modal-title" id="recModalTitle">Novo Processo Seletivo</span>
+      <button class="modal-close" onclick="closeRecModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <input type="hidden" id="recId">
+      <div class="form-group full">
+        <label class="form-label">Processo Seletivo (Cargo) *</label>
+        <input type="text" class="form-input" id="recProcesso" placeholder="Ex: Médico Analista de Holter">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data Inicial *</label>
+        <input type="date" class="form-input" id="recDataIni">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data Final</label>
+        <input type="date" class="form-input" id="recDataFim" oninput="calcRecDuracao()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nº de Vagas</label>
+        <input type="number" class="form-input" id="recVagas" placeholder="1" min="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Situação</label>
+        <select class="form-select" id="recSituacao">
+          <option>Em andamento</option><option>Finalizado</option><option>Cancelado</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Currículos Recebidos</label>
+        <input type="number" class="form-input" id="recCurriculos" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Currículos Triados</label>
+        <input type="number" class="form-input" id="recTriados" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Entrevistas Realizadas</label>
+        <input type="number" class="form-input" id="recEntrevistas" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Testes Práticos</label>
+        <input type="number" class="form-input" id="recTestes" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Entrevista com Gestor</label>
+        <input type="number" class="form-input" id="recGestor" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contratações</label>
+        <input type="number" class="form-input" id="recContratacoes" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Duração (dias) <span style="font-weight:400;color:#888">(auto)</span></label>
+        <input type="number" class="form-input" id="recDuracao" placeholder="0" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Valor Divulgação (R$)</label>
+        <input type="number" class="form-input" id="recDivulgacao" placeholder="0.00" step="0.01" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hora Recrutador (R$)</label>
+        <input type="number" class="form-input" id="recHoraRec" placeholder="0.00" step="0.01" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Custo Total (R$) <span style="font-weight:400;color:#888">(auto)</span></label>
+        <input type="number" class="form-input" id="recCustoTotal" placeholder="0.00" step="0.01" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Custo por Contratação (R$) <span style="font-weight:400;color:#888">(auto)</span></label>
+        <input type="number" class="form-input" id="recCustoPor" placeholder="0.00" step="0.01" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeRecModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRec()">Salvar</button>
     </div>
   </div>
 </div>
@@ -720,14 +838,15 @@ function calcTempoCasa(admissao, demissao, status) {
   return anos + ' ano' + (anos !== 1 ? 's' : '') + (m > 0 ? ' e ' + m + ' mes' + (m !== 1 ? 'es' : '') : '');
 }
 
-let allColabs = [], allHc = [], allAbs = [], allRot = [];
-let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null;
+let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [];
+let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null;
 
 async function loadAll() {
   await loadColabs();
   await loadHeadcount();
   await loadAbs();
   await loadRot();
+  await loadRec();
 }
 
 // ══ COLABORADORES ══════════════════════════════════════════
@@ -1513,6 +1632,265 @@ function importRotExcel(input) {
     }
     toast(`${importados} mês(es) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
     input.value=''; await loadRot();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══ RECRUTAMENTO ════════════════════════════════════════════
+async function loadRec() {
+  try {
+    const snap = await db.collection('recrutamento').orderBy('data_inicial').get();
+    allRec = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderRecKpis();
+    renderRecCharts();
+    renderRecTable();
+  } catch(e) { console.error('loadRec', e); }
+}
+
+function renderRecKpis() {
+  const total      = allRec.length;
+  const finalizados= allRec.filter(r=>r.situacao==='Finalizado').length;
+  const cancelados = allRec.filter(r=>r.situacao==='Cancelado').length;
+  const emAndamento= allRec.filter(r=>r.situacao==='Em andamento').length;
+  const contratacoes = allRec.reduce((s,r)=>s+(r.contratacoes||0),0);
+  const duracoes   = allRec.filter(r=>r.duracao_dias>0).map(r=>r.duracao_dias);
+  const mediaDur   = duracoes.length ? (duracoes.reduce((a,b)=>a+b,0)/duracoes.length).toFixed(0) : '—';
+  const custos     = allRec.filter(r=>r.custo_por_contratacao>0).map(r=>r.custo_por_contratacao);
+  const mediaCusto = custos.length ? (custos.reduce((a,b)=>a+b,0)/custos.length).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—';
+  const curriculos = allRec.reduce((s,r)=>s+(r.curriculos_recebidos||0),0);
+  document.getElementById('recKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">Total de Processos</div><div class="kpi-val">${total}</div><div class="kpi-sub">${finalizados} finalizados · ${emAndamento} em andamento</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Contratações</div><div class="kpi-val" style="color:#00a878">${contratacoes}</div><div class="kpi-sub">${cancelados} processos cancelados</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Tempo Médio</div><div class="kpi-val" style="color:#0b4e7d">${mediaDur} dias</div><div class="kpi-sub">por processo seletivo</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Custo Médio/Contratação</div><div class="kpi-val" style="font-size:18px;color:#d97706">${mediaCusto}</div><div class="kpi-sub">${curriculos.toLocaleString('pt-BR')} currículos recebidos</div></div>`;
+}
+
+function renderRecCharts() {
+  // Processos por mês
+  const porMes = {};
+  allRec.forEach(r => {
+    if (!r.data_inicial) return;
+    const key = r.data_inicial.slice(0,7);
+    porMes[key] = (porMes[key]||0) + 1;
+  });
+  const mesesLabel = Object.keys(porMes).sort().slice(-18);
+  if (chartRecMes) chartRecMes.destroy();
+  chartRecMes = new Chart(document.getElementById('chartRecMes'), {
+    type:'bar',
+    data:{ labels: mesesLabel.map(k=>{ const [y,m]=k.split('-'); return (MESES_NOME[parseInt(m)]||m).slice(0,3)+'/'+y.slice(2); }),
+           datasets:[{ label:'Processos', data: mesesLabel.map(k=>porMes[k]||0), backgroundColor:'#1a8fe3', borderRadius:4 }] },
+    options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ ticks:{ stepSize:1 } } } }
+  });
+  // Funil
+  const curriculos   = allRec.reduce((s,r)=>s+(r.curriculos_recebidos||0),0);
+  const triados      = allRec.reduce((s,r)=>s+(r.curriculos_triados||0),0);
+  const entrevistas  = allRec.reduce((s,r)=>s+(r.entrevistas_realizadas||0),0);
+  const testes       = allRec.reduce((s,r)=>s+(r.testes_praticos||0),0);
+  const gestor       = allRec.reduce((s,r)=>s+(r.entrevista_gestor||0),0);
+  const contratacoes = allRec.reduce((s,r)=>s+(r.contratacoes||0),0);
+  if (chartRecFunil) chartRecFunil.destroy();
+  chartRecFunil = new Chart(document.getElementById('chartRecFunil'), {
+    type:'bar',
+    data:{ labels:['Currículos','Triados','Entrevistas','Testes','C/ Gestor','Contratações'],
+           datasets:[{ data:[curriculos,triados,entrevistas,testes,gestor,contratacoes],
+             backgroundColor:['#0b4e7d','#1a8fe3','#3b82f6','#60a5fa','#93c5fd','#00a878'], borderRadius:4 }] },
+    options:{ indexAxis:'y', responsive:true, plugins:{ legend:{ display:false } } }
+  });
+}
+
+function renderRecTable() {
+  const q   = (document.getElementById('recSearch')?.value||'').toLowerCase();
+  const sit = document.getElementById('recFiltroSit')?.value||'';
+  const lista = allRec.filter(r => {
+    if (sit && r.situacao !== sit) return false;
+    return !q || (r.processo||'').toLowerCase().includes(q);
+  }).sort((a,b) => (b.data_inicial||'') > (a.data_inicial||'') ? 1 : -1);
+  const wrap = document.getElementById('recTableWrap');
+  if (!lista.length) { wrap.innerHTML=`<div class="empty-state">Nenhum processo encontrado.</div>`; return; }
+  const corSit = s => s==='Finalizado'?'badge-green':s==='Cancelado'?'badge-red':'badge-orange';
+  const brl = v => (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  wrap.innerHTML = `<div style="overflow-x:auto"><table class="table"><thead><tr>
+    <th>Data Ini.</th><th>Processo Seletivo</th><th>Vagas</th><th>Currículos</th><th>Entrevistas</th><th>Contrat.</th><th>Duração</th><th>Custo/Cont.</th><th>Situação</th><th></th>
+  </tr></thead><tbody>${lista.map(r=>`<tr>
+    <td>${r.data_inicial||'—'}</td>
+    <td><strong>${r.processo||'—'}</strong></td>
+    <td>${r.num_vagas||1}</td>
+    <td>${r.curriculos_recebidos||0}</td>
+    <td>${r.entrevistas_realizadas||0}</td>
+    <td>${r.contratacoes||0}</td>
+    <td>${r.duracao_dias||'—'}${r.duracao_dias?' dias':''}</td>
+    <td>${brl(r.custo_por_contratacao)}</td>
+    <td><span class="badge ${corSit(r.situacao)}">${r.situacao||'—'}</span></td>
+    <td><div style="display:flex;gap:6px">
+      <button class="btn btn-sm btn-outline" onclick='editRec("${r.id}")'>Editar</button>
+      <button class="btn btn-sm btn-danger"  onclick='deleteRec("${r.id}")'>Excluir</button>
+    </div></td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+function filterRec() { renderRecTable(); }
+
+function calcRecDuracao() {
+  const ini = document.getElementById('recDataIni').value;
+  const fim = document.getElementById('recDataFim').value;
+  if (ini && fim) {
+    const dias = Math.round((new Date(fim) - new Date(ini)) / 86400000);
+    document.getElementById('recDuracao').value = dias > 0 ? dias : '';
+  }
+  const div = parseFloat(document.getElementById('recDivulgacao').value)||0;
+  const hr  = parseFloat(document.getElementById('recHoraRec').value)||0;
+  const ct  = div + hr;
+  const cont= parseFloat(document.getElementById('recContratacoes').value)||0;
+  document.getElementById('recCustoTotal').value = ct > 0 ? ct.toFixed(2) : '';
+  document.getElementById('recCustoPor').value   = (ct > 0 && cont > 0) ? (ct/cont).toFixed(2) : '';
+}
+
+function openRecModal() {
+  document.getElementById('recId').value = '';
+  ['recProcesso','recDataIni','recDataFim','recVagas','recCurriculos','recTriados',
+   'recEntrevistas','recTestes','recGestor','recContratacoes','recDuracao',
+   'recDivulgacao','recHoraRec','recCustoTotal','recCustoPor'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('recSituacao').value = 'Em andamento';
+  document.getElementById('recDataIni').value = new Date().toISOString().slice(0,10);
+  document.getElementById('recModalTitle').textContent = 'Novo Processo Seletivo';
+  document.getElementById('recModal').classList.add('open');
+}
+
+function editRec(id) {
+  const r = allRec.find(x=>x.id===id); if (!r) return;
+  document.getElementById('recId').value            = r.id;
+  document.getElementById('recProcesso').value      = r.processo||'';
+  document.getElementById('recDataIni').value       = r.data_inicial||'';
+  document.getElementById('recDataFim').value       = r.data_final||'';
+  document.getElementById('recVagas').value         = r.num_vagas||'';
+  document.getElementById('recSituacao').value      = r.situacao||'Em andamento';
+  document.getElementById('recCurriculos').value    = r.curriculos_recebidos||'';
+  document.getElementById('recTriados').value       = r.curriculos_triados||'';
+  document.getElementById('recEntrevistas').value   = r.entrevistas_realizadas||'';
+  document.getElementById('recTestes').value        = r.testes_praticos||'';
+  document.getElementById('recGestor').value        = r.entrevista_gestor||'';
+  document.getElementById('recContratacoes').value  = r.contratacoes||'';
+  document.getElementById('recDuracao').value       = r.duracao_dias||'';
+  document.getElementById('recDivulgacao').value    = r.valor_divulgacao||'';
+  document.getElementById('recHoraRec').value       = r.hora_recrutador||'';
+  document.getElementById('recCustoTotal').value    = r.custo_total||'';
+  document.getElementById('recCustoPor').value      = r.custo_por_contratacao||'';
+  document.getElementById('recModalTitle').textContent = 'Editar Processo';
+  document.getElementById('recModal').classList.add('open');
+}
+
+function closeRecModal() { document.getElementById('recModal').classList.remove('open'); }
+
+async function saveRec() {
+  const id      = document.getElementById('recId').value;
+  const processo= document.getElementById('recProcesso').value.trim();
+  if (!processo) { toast('Informe o cargo/processo seletivo','e'); return; }
+  const div  = parseFloat(document.getElementById('recDivulgacao').value)||0;
+  const hr   = parseFloat(document.getElementById('recHoraRec').value)||0;
+  const ct   = parseFloat(document.getElementById('recCustoTotal').value)||(div+hr);
+  const cont = parseFloat(document.getElementById('recContratacoes').value)||0;
+  const payload = {
+    processo,
+    data_inicial:          document.getElementById('recDataIni').value||'',
+    data_final:            document.getElementById('recDataFim').value||'',
+    num_vagas:             parseInt(document.getElementById('recVagas').value)||1,
+    situacao:              document.getElementById('recSituacao').value,
+    curriculos_recebidos:  parseInt(document.getElementById('recCurriculos').value)||0,
+    curriculos_triados:    parseInt(document.getElementById('recTriados').value)||0,
+    entrevistas_realizadas:parseInt(document.getElementById('recEntrevistas').value)||0,
+    testes_praticos:       parseInt(document.getElementById('recTestes').value)||0,
+    entrevista_gestor:     parseInt(document.getElementById('recGestor').value)||0,
+    contratacoes:          cont,
+    duracao_dias:          parseInt(document.getElementById('recDuracao').value)||0,
+    valor_divulgacao:      div,
+    hora_recrutador:       hr,
+    custo_total:           ct,
+    custo_por_contratacao: cont > 0 ? parseFloat((ct/cont).toFixed(2)) : 0,
+  };
+  try {
+    if (id) await db.collection('recrutamento').doc(id).update(payload);
+    else    await db.collection('recrutamento').add(payload);
+    toast(id ? 'Processo atualizado!' : 'Processo salvo!');
+    closeRecModal();
+    await loadRec();
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+async function deleteRec(id) {
+  if (!confirm('Excluir este processo?')) return;
+  try {
+    await db.collection('recrutamento').doc(id).delete();
+    toast('Processo excluído.');
+    await loadRec();
+  } catch(e) { toast('Erro ao excluir','e'); }
+}
+
+function importRecExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const wb = XLSX.read(e.target.result, {type:'array'});
+    const _nn = n => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const abaNome = wb.SheetNames.find(n=>_nn(n).includes('recrutamento')||_nn(n).includes('selecao')||_nn(n).includes('seleção')) || wb.SheetNames[0];
+    const ws = wb.Sheets[abaNome];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+    if (!rows.length) { toast('Planilha vazia','e'); return; }
+    function norm(s){ return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+    function findCol(row, terms){ return Object.keys(row).find(k=>terms.some(t=>norm(k).includes(t)))||null; }
+    const sample = rows[0];
+    const colProcesso   = findCol(sample,['processo','cargo','vaga']);
+    const colDataIni    = findCol(sample,['data ini','data_ini','inicio','abertura']);
+    const colDataFim    = findCol(sample,['data fin','data_fin','final','fechamento','encerramento']);
+    const colVagas      = findCol(sample,['vaga','num']);
+    const colCurric     = findCol(sample,['curriculo','curriculos receb']);
+    const colTriados    = findCol(sample,['triado']);
+    const colEntrev     = findCol(sample,['entrevista','entrev real']);
+    const colTestes     = findCol(sample,['teste']);
+    const colGestor     = findCol(sample,['gestor']);
+    const colCont       = findCol(sample,['contrat']);
+    const colSit        = findCol(sample,['situa']);
+    const colDur        = findCol(sample,['dura']);
+    const colDiv        = findCol(sample,['divulg']);
+    const colHrRec      = findCol(sample,['hora recr','hora_recr']);
+    const colCustoT     = findCol(sample,['custo tot','custo_tot']);
+    const colCustoPor   = findCol(sample,['custo por','custo_por']);
+    function xdate(v){ if(!v) return ''; if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*86400000)); return d.toISOString().slice(0,10); } return String(v).trim(); }
+    function xnum(v){ return parseFloat(String(v).replace('R$','').replace(/\./g,'').replace(',','.').trim())||0; }
+    const registros = rows.filter(r => colProcesso && r[colProcesso]).map(r => {
+      const div  = xnum(colDiv?r[colDiv]:0);
+      const hr   = xnum(colHrRec?r[colHrRec]:0);
+      const ct   = colCustoT ? xnum(r[colCustoT]) : div+hr;
+      const cont = parseInt(colCont?r[colCont]:0)||0;
+      return {
+        processo:              String(colProcesso?r[colProcesso]:'').trim(),
+        data_inicial:          xdate(colDataIni?r[colDataIni]:''),
+        data_final:            xdate(colDataFim?r[colDataFim]:''),
+        num_vagas:             parseInt(colVagas?r[colVagas]:1)||1,
+        situacao:              colSit?String(r[colSit]).trim():'Finalizado',
+        curriculos_recebidos:  parseInt(colCurric?r[colCurric]:0)||0,
+        curriculos_triados:    parseInt(colTriados?r[colTriados]:0)||0,
+        entrevistas_realizadas:parseInt(colEntrev?r[colEntrev]:0)||0,
+        testes_praticos:       parseInt(colTestes?r[colTestes]:0)||0,
+        entrevista_gestor:     parseInt(colGestor?r[colGestor]:0)||0,
+        contratacoes:          cont,
+        duracao_dias:          parseInt(colDur?r[colDur]:0)||0,
+        valor_divulgacao:      div,
+        hora_recrutador:       hr,
+        custo_total:           ct,
+        custo_por_contratacao: cont>0 ? parseFloat((ct/cont).toFixed(2)) : xnum(colCustoPor?r[colCustoPor]:0),
+      };
+    }).filter(r=>r.processo);
+    if (!registros.length) { toast('Nenhum processo encontrado','e'); return; }
+    if (allRec.length > 0) {
+      const sub = confirm(`Já existem ${allRec.length} registros.\n\nOK = SUBSTITUIR\nCancelar = ADICIONAR`);
+      if (sub) { const batch=db.batch(); allRec.forEach(r=>batch.delete(db.collection('recrutamento').doc(r.id))); await batch.commit(); }
+    }
+    let importados=0, erros=0;
+    for (const p of registros) {
+      try { await db.collection('recrutamento').add(p); importados++; } catch(err){ erros++; }
+    }
+    toast(`${importados} processo(s) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
+    input.value=''; await loadRec();
   };
   reader.readAsArrayBuffer(file);
 }
