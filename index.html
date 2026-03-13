@@ -285,6 +285,10 @@
           <span class="card-title">Processos Seletivos</span>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <input class="search-bar" type="text" id="recSearch" placeholder="Buscar vaga..." oninput="filterRec()">
+            <select class="form-select" id="recFiltroAno" onchange="filterRec()" style="width:90px;padding:8px 12px;font-size:13px">
+              <option value="">Todos</option>
+              <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+            </select>
             <select class="form-select" id="recFiltroSit" onchange="filterRec()" style="width:auto;padding:8px 12px;font-size:13px">
               <option value="">Todos</option>
               <option value="Finalizado">Finalizados</option>
@@ -1701,8 +1705,10 @@ function renderRecCharts() {
 function renderRecTable() {
   const q   = (document.getElementById('recSearch')?.value||'').toLowerCase();
   const sit = document.getElementById('recFiltroSit')?.value||'';
+  const ano = document.getElementById('recFiltroAno')?.value||'';
   const lista = allRec.filter(r => {
     if (sit && r.situacao !== sit) return false;
+    if (ano && !(r.data_inicial||'').startsWith(ano)) return false;
     return !q || (r.processo||'').toLowerCase().includes(q);
   }).sort((a,b) => (b.data_inicial||'') > (a.data_inicial||'') ? 1 : -1);
   const wrap = document.getElementById('recTableWrap');
@@ -1838,7 +1844,6 @@ function importRecExcel(input) {
     function norm(s){ return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
     function findCol(row, terms){ return Object.keys(row).find(k=>terms.some(t=>norm(k).includes(t)))||null; }
     const sample = rows[0];
-    alert('Aba: ' + abaNome + '\nTotal linhas: ' + rows.length + '\nColunas:\n' + Object.keys(sample).join('\n'));
     const colProcesso   = findCol(sample,['processo seletivo','processo','cargo','vaga']);
     const colDataIni    = findCol(sample,['data ini','data inicial','inicio','abertura']);
     const colDataFim    = findCol(sample,['data fin','data final','final','fechamento','encerramento']);
@@ -1856,7 +1861,7 @@ function importRecExcel(input) {
     const colCustoT     = findCol(sample,['custo tot','custo total']);
     const colCustoPor   = findCol(sample,['custo por','custo_por','custo por contrat']);
     function xdate(v){ if(!v) return ''; if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*86400000)); return d.toISOString().slice(0,10); } return String(v).trim(); }
-    function xnum(v){ return parseFloat(String(v).replace('R$','').replace(/\./g,'').replace(',','.').trim())||0; }
+    function xnum(v){ if (typeof v === 'number') return v; return parseFloat(String(v).replace('R$','').replace(/\./g,'').replace(',','.').trim())||0; }
     const registros = rows.filter(r => colProcesso && r[colProcesso]).map(r => {
       const div  = xnum(colDiv?r[colDiv]:0);
       const hr   = xnum(colHrRec?r[colHrRec]:0);
