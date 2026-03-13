@@ -259,10 +259,14 @@
       </div>
       <div class="form-group">
         <label class="form-label">Tipo de Contrato</label>
-        <select class="form-select" id="colabTipo">
+        <select class="form-select" id="colabTipo" onchange="toggleHorasMensais()">
           <option value="">Selecione...</option>
           <option>PJ</option><option>CLT</option><option>Estágio</option><option>Prolabore</option>
         </select>
+      </div>
+      <div class="form-group" id="colabHorasGrp" style="display:none">
+        <label class="form-label">Horas Mensais Contratadas</label>
+        <input type="number" class="form-input" id="colabHoras" placeholder="Ex: 220" step="1" min="1">
       </div>
       <div class="form-group">
         <label class="form-label">Status</label>
@@ -337,19 +341,19 @@
       </div>
       <div class="form-group">
         <label class="form-label">Faltas e Atestados (horas)</label>
-        <input type="number" class="form-input" id="absFaltas" placeholder="0" step="0.1">
+        <input type="number" class="form-input" id="absFaltas" placeholder="0" step="0.1" oninput="calcAbsPerc()">
       </div>
       <div class="form-group">
         <label class="form-label">Total de Atrasos (horas)</label>
-        <input type="number" class="form-input" id="absAtrasos" placeholder="0" step="0.1">
+        <input type="number" class="form-input" id="absAtrasos" placeholder="0" step="0.1" oninput="calcAbsPerc()">
       </div>
       <div class="form-group">
-        <label class="form-label">Total de Horas Contratadas</label>
-        <input type="number" class="form-input" id="absHoras" placeholder="0">
+        <label class="form-label">Total de Horas Contratadas <span style="font-weight:400;color:#888">(auto)</span></label>
+        <input type="number" class="form-input" id="absHoras" placeholder="calculado dos CLTs" oninput="calcAbsPerc()">
       </div>
       <div class="form-group">
-        <label class="form-label">% Absenteísmo</label>
-        <input type="number" class="form-input" id="absPerc" placeholder="0.00" step="0.01">
+        <label class="form-label">% Absenteísmo (calculado)</label>
+        <input type="number" class="form-input" id="absPerc" placeholder="0.00" step="0.01" readonly style="background:#f5f5f5;cursor:default">
       </div>
     </div>
     <div class="form-actions">
@@ -693,11 +697,18 @@ function filterColabs(q) {
   ));
 }
 
+function toggleHorasMensais() {
+  const tipo = document.getElementById('colabTipo').value;
+  const show = tipo === 'CLT' || tipo === 'Estágio';
+  document.getElementById('colabHorasGrp').style.display = show ? '' : 'none';
+}
+
 function openColabModal() {
-  ['colabId','colabNome','colabSetor','colabCargo','colabAdmissao','colabDemissao','colabNascimento','colabEmail','colabCpf','colabCnpj'].forEach(id => document.getElementById(id).value = '');
+  ['colabId','colabNome','colabSetor','colabCargo','colabAdmissao','colabDemissao','colabNascimento','colabEmail','colabCpf','colabCnpj','colabHoras'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('colabTipo').value   = '';
   document.getElementById('colabStatus').value = 'Ativo';
   document.getElementById('colabGenero').value = '';
+  document.getElementById('colabHorasGrp').style.display = 'none';
   document.getElementById('colabModalTitle').textContent = 'Novo Colaborador';
   document.getElementById('colabModal').classList.add('open');
 }
@@ -717,6 +728,8 @@ function editColab(id) {
   document.getElementById('colabEmail').value      = c.email||'';
   document.getElementById('colabCpf').value        = c.cpf||'';
   document.getElementById('colabCnpj').value       = c.cnpj||'';
+  document.getElementById('colabHoras').value      = c.horas_mensais||'';
+  toggleHorasMensais();
   document.getElementById('colabModalTitle').textContent = 'Editar Colaborador';
   document.getElementById('colabModal').classList.add('open');
 }
@@ -740,6 +753,7 @@ async function saveColab() {
     email:           document.getElementById('colabEmail').value.trim()||'',
     cpf:             document.getElementById('colabCpf').value.trim()||'',
     cnpj:            document.getElementById('colabCnpj').value.trim()||'',
+    horas_mensais:   parseFloat(document.getElementById('colabHoras').value)||0,
   };
   try {
     if (id) await db.collection('colaboradores').doc(id).update(payload);
@@ -997,7 +1011,13 @@ function openAbsModal() {
   const hoje = new Date();
   document.getElementById('absMes').value = String(hoje.getMonth()+1).padStart(2,'0');
   document.getElementById('absAno').value = String(hoje.getFullYear());
-  ['absFaltas','absAtrasos','absHoras','absPerc'].forEach(id => document.getElementById(id).value = '');
+  ['absFaltas','absAtrasos','absPerc'].forEach(id => document.getElementById(id).value = '');
+  // Pré-calcula horas contratadas: soma dos CLTs/Estagiários ativos
+  const horasAuto = (allColabs||[])
+    .filter(c => /^ativ/i.test(c.status) && (c.tipo_contrato==='CLT'||c.tipo_contrato==='Estágio') && c.horas_mensais > 0)
+    .reduce((s,c) => s + (c.horas_mensais||0), 0);
+  document.getElementById('absHoras').value = horasAuto || '';
+  calcAbsPerc();
   document.getElementById('absModalTitle').textContent = 'Adicionar Mês';
   document.getElementById('absModal').classList.add('open');
 }
@@ -1017,6 +1037,13 @@ function editAbs(id) {
 }
 
 function closeAbsModal() { document.getElementById('absModal').classList.remove('open'); }
+
+function calcAbsPerc() {
+  const faltas  = parseFloat(document.getElementById('absFaltas').value)||0;
+  const atrasos = parseFloat(document.getElementById('absAtrasos').value)||0;
+  const horas   = parseFloat(document.getElementById('absHoras').value)||0;
+  document.getElementById('absPerc').value = horas > 0 ? ((faltas + atrasos) / horas * 100).toFixed(2) : '';
+}
 
 async function saveAbs() {
   const id  = document.getElementById('absId').value;
