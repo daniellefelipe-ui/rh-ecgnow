@@ -1053,7 +1053,12 @@ function importAbsExcel(input) {
   const reader = new FileReader();
   reader.onload = async function(e) {
     const wb  = XLSX.read(e.target.result, { type:'array' });
-    const ws  = wb.Sheets[wb.SheetNames[0]];
+    // Procura pela aba correta: "Absenteísmo", "Faltas e Atestados" ou similar
+    const abaNome = wb.SheetNames.find(n => {
+      const nn = n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      return nn.includes('absenteismo') || nn === 'faltas e atestados' || nn.startsWith('faltas');
+    }) || wb.SheetNames[0];
+    const ws  = wb.Sheets[abaNome];
 
     function norm(s) {
       return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
