@@ -180,7 +180,12 @@
         <div class="card-header">
           <span class="card-title">Lista de Colaboradores</span>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <input class="search-bar" type="text" placeholder="Buscar..." oninput="filterColabs(this.value)">
+            <input class="search-bar" type="text" id="colabSearch" placeholder="Buscar..." oninput="filterColabs()">
+            <select class="form-select" id="colabFiltroStatus" onchange="filterColabs()" style="width:auto;padding:8px 12px;font-size:13px">
+              <option value="">Todos</option>
+              <option value="ativo">Ativos</option>
+              <option value="inativo">Inativos</option>
+            </select>
             <button class="btn btn-outline" onclick="document.getElementById('excelInput').click()">📥 Importar Excel</button>
             <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
             <button class="btn btn-primary" onclick="openColabModal()">+ Novo Colaborador</button>
@@ -689,13 +694,16 @@ function renderColabTable(list) {
     </tr>`).join('')}</tbody></table>`;
 }
 
-function filterColabs(q) {
-  const f = q.toLowerCase();
-  renderColabTable(allColabs.filter(c =>
-    (c.nome||'').toLowerCase().includes(f) ||
-    (c.setor||'').toLowerCase().includes(f) ||
-    (c.cargo||'').toLowerCase().includes(f)
-  ));
+function filterColabs() {
+  const q = (document.getElementById('colabSearch')?.value||'').toLowerCase();
+  const s = (document.getElementById('colabFiltroStatus')?.value||'').toLowerCase();
+  renderColabTable(allColabs.filter(c => {
+    if (s === 'ativo'   && !/^ativ/i.test(c.status)) return false;
+    if (s === 'inativo' &&  /^ativ/i.test(c.status)) return false;
+    return !q || (c.nome||'').toLowerCase().includes(q) ||
+                 (c.setor||'').toLowerCase().includes(q) ||
+                 (c.cargo||'').toLowerCase().includes(q);
+  }));
 }
 
 function toggleHorasMensais() {
