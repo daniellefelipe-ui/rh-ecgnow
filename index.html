@@ -250,6 +250,22 @@
         </select>
       </div>
       <div class="form-group">
+        <label class="form-label">Data de Nascimento</label>
+        <input type="date" class="form-input" id="colabNascimento">
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input type="email" class="form-input" id="colabEmail" placeholder="email@exemplo.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">CPF</label>
+        <input type="text" class="form-input" id="colabCpf" placeholder="000.000.000-00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">CNPJ</label>
+        <input type="text" class="form-input" id="colabCnpj" placeholder="00.000.000/0000-00">
+      </div>
+      <div class="form-group">
         <label class="form-label">Data de Admissão</label>
         <input type="date" class="form-input" id="colabAdmissao">
       </div>
@@ -399,6 +415,28 @@ function toast(msg, type='s') {
 function fmt(v) { return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
 function n(id)  { return parseFloat(document.getElementById(id).value) || 0; }
 
+function calcIdade(dataNasc) {
+  if (!dataNasc) return '—';
+  const nasc = new Date(dataNasc + 'T12:00:00');
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade + ' anos';
+}
+
+function calcTempoCasa(admissao, demissao, status) {
+  if (!admissao) return '—';
+  const ini  = new Date(admissao + 'T12:00:00');
+  const fim  = (status !== 'Ativo' && demissao) ? new Date(demissao + 'T12:00:00') : new Date();
+  let meses  = (fim.getFullYear() - ini.getFullYear()) * 12 + (fim.getMonth() - ini.getMonth());
+  if (meses < 0) meses = 0;
+  const anos = Math.floor(meses / 12);
+  const m    = meses % 12;
+  if (anos === 0) return m + ' mes' + (m !== 1 ? 'es' : '');
+  return anos + ' ano' + (anos !== 1 ? 's' : '') + (m > 0 ? ' e ' + m + ' mes' + (m !== 1 ? 'es' : '') : '');
+}
+
 let allColabs = [], allHc = [];
 let chartTipo = null, chartSetor = null;
 
@@ -426,14 +464,19 @@ function renderColabTable(list) {
   }
   const tipoClass = { PJ:'badge-orange', CLT:'badge-blue', 'Estágio':'badge-purple', Prolabore:'badge-green' };
   wrap.innerHTML = `<table class="table">
-    <thead><tr><th>Nome</th><th>Setor</th><th>Cargo</th><th>Contrato</th><th>Gênero</th><th>Admissão</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Nome</th><th>Setor</th><th>Cargo</th><th>Contrato</th><th>Gênero</th><th>Nascimento</th><th>Idade</th><th>Tempo de Casa</th><th>Admissão</th><th>E-mail</th><th>CPF/CNPJ</th><th>Status</th><th></th></tr></thead>
     <tbody>${list.map(c => `<tr>
       <td><strong style="color:#1a2535">${c.nome}</strong></td>
       <td>${c.setor||'—'}</td>
       <td>${c.cargo||'—'}</td>
       <td><span class="badge ${tipoClass[c.tipo_contrato]||'badge-green'}">${c.tipo_contrato||'—'}</span></td>
       <td>${c.genero==='F'?'♀ Fem':c.genero==='M'?'♂ Mas':'—'}</td>
+      <td>${c.data_nascimento||'—'}</td>
+      <td>${calcIdade(c.data_nascimento)}</td>
+      <td>${calcTempoCasa(c.data_admissao, c.data_demissao, c.status)}</td>
       <td>${c.data_admissao||'—'}</td>
+      <td>${c.email||'—'}</td>
+      <td>${c.cpf||c.cnpj||'—'}</td>
       <td><span class="badge ${c.status==='Ativo'?'badge-green':'badge-red'}">${c.status}</span></td>
       <td><div style="display:flex;gap:6px">
         <button class="btn btn-sm btn-outline" onclick='editColab("${c.id}")'>Editar</button>
@@ -452,7 +495,7 @@ function filterColabs(q) {
 }
 
 function openColabModal() {
-  ['colabId','colabNome','colabSetor','colabCargo','colabAdmissao','colabDemissao'].forEach(id => document.getElementById(id).value = '');
+  ['colabId','colabNome','colabSetor','colabCargo','colabAdmissao','colabDemissao','colabNascimento','colabEmail','colabCpf','colabCnpj'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('colabTipo').value   = '';
   document.getElementById('colabStatus').value = 'Ativo';
   document.getElementById('colabGenero').value = '';
@@ -469,8 +512,12 @@ function editColab(id) {
   document.getElementById('colabTipo').value     = c.tipo_contrato||'';
   document.getElementById('colabStatus').value   = c.status||'Ativo';
   document.getElementById('colabGenero').value   = c.genero||'';
-  document.getElementById('colabAdmissao').value = c.data_admissao||'';
-  document.getElementById('colabDemissao').value = c.data_demissao||'';
+  document.getElementById('colabAdmissao').value   = c.data_admissao||'';
+  document.getElementById('colabDemissao').value   = c.data_demissao||'';
+  document.getElementById('colabNascimento').value = c.data_nascimento||'';
+  document.getElementById('colabEmail').value      = c.email||'';
+  document.getElementById('colabCpf').value        = c.cpf||'';
+  document.getElementById('colabCnpj').value       = c.cnpj||'';
   document.getElementById('colabModalTitle').textContent = 'Editar Colaborador';
   document.getElementById('colabModal').classList.add('open');
 }
@@ -488,8 +535,12 @@ async function saveColab() {
     tipo_contrato: document.getElementById('colabTipo').value||'',
     status:        document.getElementById('colabStatus').value,
     genero:        document.getElementById('colabGenero').value||'',
-    data_admissao: document.getElementById('colabAdmissao').value||'',
-    data_demissao: document.getElementById('colabDemissao').value||'',
+    data_admissao:   document.getElementById('colabAdmissao').value||'',
+    data_demissao:   document.getElementById('colabDemissao').value||'',
+    data_nascimento: document.getElementById('colabNascimento').value||'',
+    email:           document.getElementById('colabEmail').value.trim()||'',
+    cpf:             document.getElementById('colabCpf').value.trim()||'',
+    cnpj:            document.getElementById('colabCnpj').value.trim()||'',
   };
   try {
     if (id) await db.collection('colaboradores').doc(id).update(payload);
