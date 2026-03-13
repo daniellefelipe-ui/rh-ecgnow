@@ -496,6 +496,16 @@ function importExcel(input) {
 
     function cell(row, idx) { return idx >= 0 ? String(row[idx]||'').trim() : ''; }
 
+    // Se já existem colaboradores, pergunta se quer substituir
+    if (allColabs.length > 0) {
+      const substituir = confirm(`Já existem ${allColabs.length} colaborador(es) cadastrado(s).\n\nClique em OK para SUBSTITUIR todos os dados pela planilha.\nClique em Cancelar para ADICIONAR à lista existente.`);
+      if (substituir) {
+        const batch = db.batch();
+        allColabs.forEach(c => batch.delete(db.collection('colaboradores').doc(c.id)));
+        await batch.commit();
+      }
+    }
+
     let importados = 0, erros = 0;
     for (const row of dataRows) {
       const nome = cell(row, colIdx.nome);
