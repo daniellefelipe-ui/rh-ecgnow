@@ -227,6 +227,7 @@
             </select>
             <button class="btn btn-outline" onclick="document.getElementById('absExcelInput').click()">📥 Importar Excel</button>
             <input type="file" id="absExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importAbsExcel(this)">
+            <button class="btn btn-outline" onclick="recalcularTodosAbs()" title="Recalcula % de todos os registros">🔄 Recalcular %</button>
             <button class="btn btn-primary" onclick="openAbsModal()">+ Adicionar Mês</button>
           </div>
         </div>
@@ -1066,6 +1067,24 @@ async function saveAbs() {
   } catch(e) { toast('Erro: ' + e.message, 'e'); }
 }
 
+async function recalcularTodosAbs() {
+  if (!confirm(`Recalcular % de absenteísmo de todos os ${allAbs.length} registros?\n(faltas + atrasos) ÷ horas contratadas × 100`)) return;
+  let ok = 0, erros = 0;
+  const batch = db.batch();
+  for (const r of allAbs) {
+    const horas = r.horas_contratadas || 0;
+    if (!horas) continue;
+    const perc = parseFloat(((( r.faltas||0) + (r.atrasos||0)) / horas * 100).toFixed(2));
+    batch.update(db.collection('absenteismo').doc(r.id), { percentual: perc });
+    ok++;
+  }
+  try {
+    await batch.commit();
+    toast(`${ok} registros recalculados!`, 's');
+    await loadAbs();
+  } catch(e) { toast('Erro: ' + e.message, 'e'); }
+}
+
 async function deleteAbs(id) {
   if (!confirm('Excluir este registro?')) return;
   try {
@@ -1194,8 +1213,8 @@ function importAbsExcel(input) {
       const faltas  = parseFloat(rowFaltas  >= 0 ? G[rowFaltas][c]  : 0)||0;
       const atrasos = parseFloat(rowAtrasos >= 0 ? G[rowAtrasos][c] : 0)||0;
       const horas   = parseFloat(rowHoras   >= 0 ? G[rowHoras][c]   : 0)||0;
-      let   perc    = parseFloat(rowPerc    >= 0 ? String(G[rowPerc][c]).replace('%','').replace(',','.') : 0)||0;
-      if (!perc && horas > 0) perc = parseFloat(((faltas+atrasos)/horas*100).toFixed(2));
+      // Sempre recalcula o % para evitar erro de decimal do Excel (0,068 ao invés de 6,8)
+      const perc = horas > 0 ? parseFloat(((faltas + atrasos) / horas * 100).toFixed(2)) : 0;
       try {
         await db.collection('absenteismo').add({ periodo, faltas, atrasos, horas_contratadas: horas, percentual: perc });
         importados++;
