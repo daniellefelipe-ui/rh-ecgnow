@@ -507,7 +507,7 @@ function importExcel(input) {
         setor:           cell(row, colIdx.setor),
         cargo:           cell(row, colIdx.cargo),
         tipo_contrato:   cell(row, colIdx.tipo_contrato),
-        status:          statusRaw || 'Ativo',
+        status:          /^ativ/i.test(statusRaw) ? 'Ativo' : (statusRaw ? 'Inativo' : 'Ativo'),
         genero:          (generoRaw === 'F' || generoRaw === 'M') ? generoRaw : '',
         data_nascimento: fmtDate(colIdx.data_nascimento >= 0 ? row[colIdx.data_nascimento] : ''),
         data_admissao:   fmtDate(colIdx.data_admissao >= 0   ? row[colIdx.data_admissao]   : ''),
@@ -590,7 +590,7 @@ function renderColabTable(list) {
       <td>${c.data_admissao||'—'}</td>
       <td>${c.email||'—'}</td>
       <td>${c.cpf||c.cnpj||'—'}</td>
-      <td><span class="badge ${c.status==='Ativo'?'badge-green':'badge-red'}">${c.status}</span></td>
+      <td><span class="badge ${/^ativ/i.test(c.status)?'badge-green':'badge-red'}">${c.status}</span></td>
       <td><div style="display:flex;gap:6px">
         <button class="btn btn-sm btn-outline" onclick='editColab("${c.id}")'>Editar</button>
         <button class="btn btn-sm btn-danger"  onclick='deleteColab("${c.id}","${(c.nome||'').replace(/"/g,'\\"')}")'>Excluir</button>
@@ -820,8 +820,8 @@ async function deleteHc(id) {
 
 // ══ DASHBOARD ══════════════════════════════════════════════
 function buildDashboard() {
-  const ativos   = allColabs.filter(c => c.status === 'Ativo');
-  const inativos = allColabs.filter(c => c.status !== 'Ativo');
+  const ativos   = allColabs.filter(c => /^ativ/i.test(c.status));
+  const inativos = allColabs.filter(c => !/^ativ/i.test(c.status));
   const pj   = ativos.filter(c => c.tipo_contrato === 'PJ').length;
   const clt  = ativos.filter(c => c.tipo_contrato === 'CLT').length;
   const fem  = ativos.filter(c => c.genero === 'F').length;
