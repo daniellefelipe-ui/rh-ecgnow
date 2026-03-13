@@ -1838,6 +1838,7 @@ function importRecExcel(input) {
     function norm(s){ return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
     function findCol(row, terms){ return Object.keys(row).find(k=>terms.some(t=>norm(k).includes(t)))||null; }
     const sample = rows[0];
+    alert('Aba: ' + abaNome + '\nTotal linhas: ' + rows.length + '\nColunas:\n' + Object.keys(sample).join('\n'));
     const colProcesso   = findCol(sample,['processo seletivo','processo','cargo','vaga']);
     const colDataIni    = findCol(sample,['data ini','data inicial','inicio','abertura']);
     const colDataFim    = findCol(sample,['data fin','data final','final','fechamento','encerramento']);
