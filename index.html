@@ -1114,16 +1114,7 @@ function importAbsExcel(input) {
     }
 
     if (rowMes === -1) {
-      let dbg = 'DEBUG — primeiras 5 linhas (cols 0-7):\n';
-      for (let ri = rng.s.r; ri <= Math.min(rng.s.r+4, rng.e.r); ri++) {
-        const vals = [];
-        for (let ci = rng.s.c; ci <= Math.min(rng.s.c+7, rng.e.c); ci++) {
-          const v = G[ri]?.[ci];
-          vals.push(JSON.stringify(v) + '(' + typeof v + ')');
-        }
-        dbg += `R${ri}: ${vals.join(' | ')}\n`;
-      }
-      alert(dbg);
+      toast('Linha de meses não encontrada. Verifique se está importando a planilha correta (Absenteísmo mensal).', 'e');
       return;
     }
 
