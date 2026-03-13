@@ -425,32 +425,54 @@ function importExcel(input) {
   reader.onload = async function(e) {
     const wb   = XLSX.read(e.target.result, { type:'array', cellDates:true });
     const ws   = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
-    if (!rows.length) { toast('Planilha vazia ou sem dados', 'e'); return; }
+    // Lê como array de arrays para encontrar a linha de cabeçalho correta
+    const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+    if (!raw.length) { toast('Planilha vazia ou sem dados', 'e'); return; }
 
-    // mapeamento flexível de colunas
+    // Normaliza string removendo acentos e espaços extras
+    function norm(s) {
+      return String(s).toLowerCase().trim()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    // Encontra a linha que contém o cabeçalho (busca por "nome")
+    let headerRowIdx = -1;
+    for (let i = 0; i < Math.min(raw.length, 10); i++) {
+      const rowNorm = raw[i].map(norm);
+      if (rowNorm.some(c => c.includes('nome') || c.includes('colaborador') || c.includes('funcionario'))) {
+        headerRowIdx = i;
+        break;
+      }
+    }
+    if (headerRowIdx === -1) { toast('Cabeçalho não encontrado na planilha', 'e'); return; }
+
+    const headers = raw[headerRowIdx].map(norm);
+    const dataRows = raw.slice(headerRowIdx + 1);
+
+    // mapeamento flexível de colunas (normalizado, sem acentos)
     const map = {
-      nome:            ['nome','name','colaborador','funcionario','funcionário'],
-      setor:           ['setor','departamento','area','área'],
-      cargo:           ['cargo','função','funcao','posição','posicao'],
-      tipo_contrato:   ['tipo_contrato','tipo contrato','contrato','pj/clt','tipo'],
-      status:          ['status','situação','situacao'],
-      genero:          ['genero','gênero','sexo','gender'],
-      data_nascimento: ['data_nascimento','data nascimento','nascimento','dt_nasc','dt nasc'],
-      data_admissao:   ['data_admissao','data admissao','admissão','admissao','dt_admissao','dt admissao'],
-      data_demissao:   ['data_demissao','data demissao','demissão','demissao','dt_demissao'],
-      email:           ['email','e-mail','e_mail'],
+      nome:            ['nome completo','nome','colaborador','funcionario','name'],
+      setor:           ['setor','departamento','area'],
+      cargo:           ['cargo','funcao','posicao'],
+      tipo_contrato:   ['tipo de contrato','tipo contrato','tipo_contrato','contrato','pj/clt','tipo'],
+      status:          ['status','situacao'],
+      genero:          ['genero','sexo','gender'],
+      data_nascimento: ['data de nascimento','data nascimento','data_nascimento','nascimento','dt nasc','dt_nasc'],
+      data_admissao:   ['data de admissao','data admissao','data_admissao','admissao','dt admissao','dt_admissao'],
+      data_demissao:   ['data de demissao','data demissao','data_demissao','demissao','dt demissao','dt_demissao'],
+      email:           ['e-mail','email','e_mail'],
       cpf:             ['cpf'],
       cnpj:            ['cnpj'],
     };
 
-    function findCol(row, keys) {
-      const rowKeys = Object.keys(row).map(k => k.toLowerCase().trim());
+    // Descobre o índice de cada campo nos cabeçalhos normalizados
+    const colIdx = {};
+    for (const [field, keys] of Object.entries(map)) {
+      colIdx[field] = -1;
       for (const k of keys) {
-        const idx = rowKeys.findIndex(rk => rk.includes(k));
-        if (idx !== -1) return Object.keys(row)[idx];
+        const idx = headers.findIndex(h => h.includes(k));
+        if (idx !== -1) { colIdx[field] = idx; break; }
       }
-      return null;
     }
 
     function fmtDate(val) {
@@ -462,40 +484,42 @@ function importExcel(input) {
         return `${y}-${m}-${d}`;
       }
       const s = String(val).trim();
-      // dd/mm/yyyy
       const br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if (br) return `${br[3]}-${br[2].padStart(2,'0')}-${br[1].padStart(2,'0')}`;
+      // número serial do Excel (dias desde 1900)
+      if (/^\d{4,5}$/.test(s)) {
+        const d = new Date(Math.round((parseInt(s)-25569)*86400*1000));
+        return d.toISOString().slice(0,10);
+      }
       return s;
     }
 
-    const firstRow = rows[0];
-    const cols = {};
-    for (const [field, keys] of Object.entries(map)) {
-      cols[field] = findCol(firstRow, keys);
-    }
+    function cell(row, idx) { return idx >= 0 ? String(row[idx]||'').trim() : ''; }
 
     let importados = 0, erros = 0;
-    for (const row of rows) {
-      const nome = cols.nome ? String(row[cols.nome]||'').trim() : '';
+    for (const row of dataRows) {
+      const nome = cell(row, colIdx.nome);
       if (!nome) continue;
+      const generoRaw = cell(row, colIdx.genero).toUpperCase().charAt(0);
+      const statusRaw = cell(row, colIdx.status);
       const payload = {
         nome,
-        setor:           cols.setor           ? String(row[cols.setor]||'').trim()           : '',
-        cargo:           cols.cargo           ? String(row[cols.cargo]||'').trim()           : '',
-        tipo_contrato:   cols.tipo_contrato   ? String(row[cols.tipo_contrato]||'').trim()   : '',
-        status:          cols.status          ? String(row[cols.status]||'').trim() || 'Ativo' : 'Ativo',
-        genero:          cols.genero          ? String(row[cols.genero]||'').trim().toUpperCase().charAt(0) : '',
-        data_nascimento: cols.data_nascimento ? fmtDate(row[cols.data_nascimento]) : '',
-        data_admissao:   cols.data_admissao   ? fmtDate(row[cols.data_admissao])   : '',
-        data_demissao:   cols.data_demissao   ? fmtDate(row[cols.data_demissao])   : '',
-        email:           cols.email           ? String(row[cols.email]||'').trim()           : '',
-        cpf:             cols.cpf             ? String(row[cols.cpf]||'').trim()             : '',
-        cnpj:            cols.cnpj            ? String(row[cols.cnpj]||'').trim()            : '',
+        setor:           cell(row, colIdx.setor),
+        cargo:           cell(row, colIdx.cargo),
+        tipo_contrato:   cell(row, colIdx.tipo_contrato),
+        status:          statusRaw || 'Ativo',
+        genero:          (generoRaw === 'F' || generoRaw === 'M') ? generoRaw : '',
+        data_nascimento: fmtDate(colIdx.data_nascimento >= 0 ? row[colIdx.data_nascimento] : ''),
+        data_admissao:   fmtDate(colIdx.data_admissao >= 0   ? row[colIdx.data_admissao]   : ''),
+        data_demissao:   fmtDate(colIdx.data_demissao >= 0   ? row[colIdx.data_demissao]   : ''),
+        email:           cell(row, colIdx.email),
+        cpf:             cell(row, colIdx.cpf),
+        cnpj:            cell(row, colIdx.cnpj),
       };
       try {
         await db.collection('colaboradores').add(payload);
         importados++;
-      } catch(e) { erros++; }
+      } catch(err) { erros++; }
     }
     toast(`${importados} colaborador(es) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
     input.value = '';
