@@ -143,7 +143,7 @@
         <button class="nav-item"        onclick="showSection('colaboradores',this)">👤 &nbsp;Colaboradores</button>
         <button class="nav-item"        onclick="showSection('headcount',this)">💰 &nbsp;Headcount</button>
         <button class="nav-item" onclick="showSection('absenteismo',this)">📋 &nbsp;Absenteísmo</button>
-        <button class="nav-item" disabled>🔄 &nbsp;Rotatividade</button>
+        <button class="nav-item" onclick="showSection('rotatividade',this)">🔄 &nbsp;Rotatividade</button>
         <button class="nav-item" disabled>🎯 &nbsp;Recrutamento</button>
         <button class="nav-item" disabled>📚 &nbsp;Treinamentos</button>
         <button class="nav-item" disabled>💬 &nbsp;e-NPS</button>
@@ -237,6 +237,31 @@
           </div>
         </div>
         <div id="absTableWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
+
+    <section class="page-section" id="sec-rotatividade">
+      <div class="page-header"><h1>Rotatividade</h1></div>
+      <div class="kpi-grid" id="rotKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">% Turnover por Mês</span></div>
+        <canvas id="chartRot" height="110"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Histórico Mensal</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <select class="form-select" id="rotAnoFilter" onchange="renderRotTable()" style="width:100px">
+              <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+            </select>
+            <button class="btn btn-outline" onclick="document.getElementById('rotExcelInput').click()">📥 Importar Excel</button>
+            <input type="file" id="rotExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importRotExcel(this)">
+            <button class="btn btn-primary" onclick="openRotModal()">+ Adicionar Mês</button>
+          </div>
+        </div>
+        <div id="rotTableWrap"><div class="empty-state">Carregando...</div></div>
       </div>
     </section>
   </main>
@@ -365,6 +390,56 @@
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeAbsModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveAbs()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ROTATIVIDADE -->
+<div class="modal-overlay" id="rotModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <span class="modal-title" id="rotModalTitle">Adicionar Mês</span>
+      <button class="modal-close" onclick="closeRotModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <input type="hidden" id="rotId">
+      <div class="form-group">
+        <label class="form-label">Mês *</label>
+        <select class="form-select" id="rotMes">
+          <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+          <option value="03">Março</option><option value="04">Abril</option>
+          <option value="05">Maio</option><option value="06">Junho</option>
+          <option value="07">Julho</option><option value="08">Agosto</option>
+          <option value="09">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ano *</label>
+        <select class="form-select" id="rotAno">
+          <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nº de Demissões <span style="font-weight:400;color:#888">(auto)</span></label>
+        <input type="number" class="form-input" id="rotDemissoes" placeholder="0" min="0" oninput="calcRotPerc()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nº de Admissões <span style="font-weight:400;color:#888">(auto)</span></label>
+        <input type="number" class="form-input" id="rotAdmissoes" placeholder="0" min="0" oninput="calcRotPerc()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Total de Colaboradores</label>
+        <input type="number" class="form-input" id="rotTotal" placeholder="0" min="1" oninput="calcRotPerc()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">% Turnover (calculado)</label>
+        <input type="number" class="form-input" id="rotPerc" placeholder="0.00" step="0.01" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeRotModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRot()">Salvar</button>
     </div>
   </div>
 </div>
@@ -645,13 +720,14 @@ function calcTempoCasa(admissao, demissao, status) {
   return anos + ' ano' + (anos !== 1 ? 's' : '') + (m > 0 ? ' e ' + m + ' mes' + (m !== 1 ? 'es' : '') : '');
 }
 
-let allColabs = [], allHc = [], allAbs = [];
-let chartTipo = null, chartSetor = null, chartAbs = null;
+let allColabs = [], allHc = [], allAbs = [], allRot = [];
+let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null;
 
 async function loadAll() {
   await loadColabs();
   await loadHeadcount();
   await loadAbs();
+  await loadRot();
 }
 
 // ══ COLABORADORES ══════════════════════════════════════════
@@ -1231,6 +1307,212 @@ function importAbsExcel(input) {
     toast(`${importados} mês(es) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
     input.value = '';
     await loadAbs();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══ ROTATIVIDADE ═══════════════════════════════════════════
+async function loadRot() {
+  try {
+    const snap = await db.collection('rotatividade').orderBy('periodo').get();
+    allRot = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderRotKpis();
+    renderRotChart();
+    renderRotTable();
+  } catch(e) { console.error('loadRot', e); }
+}
+
+function renderRotKpis() {
+  const anoAtual = new Date().getFullYear();
+  const doAno = allRot.filter(r => (r.periodo||'').startsWith(String(anoAtual)));
+  const ultimo = allRot[allRot.length - 1] || {};
+  const mediaAno = doAno.length ? (doAno.reduce((s,r)=>s+(r.percentual||0),0)/doAno.length).toFixed(2) : '—';
+  const totalAdm = doAno.reduce((s,r)=>s+(r.admissoes||0),0);
+  const totalDem = doAno.reduce((s,r)=>s+(r.demissoes||0),0);
+  const [y,m] = (ultimo.periodo||'').split('-');
+  const lblUlt = m ? MESES_NOME[parseInt(m)] + '/' + y : ultimo.periodo||'—';
+  document.getElementById('rotKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">% Turnover · ${lblUlt}</div><div class="kpi-val" style="color:#0b4e7d">${(ultimo.percentual||0).toFixed(2)}%</div><div class="kpi-sub">último mês registrado</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Média ${anoAtual}</div><div class="kpi-val" style="color:#0b4e7d">${mediaAno}%</div><div class="kpi-sub">${doAno.length} meses</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Admissões ${anoAtual}</div><div class="kpi-val" style="color:#00a878">${totalAdm}</div><div class="kpi-sub">colaboradores admitidos</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Demissões ${anoAtual}</div><div class="kpi-val" style="color:#e53e3e">${totalDem}</div><div class="kpi-sub">colaboradores demitidos</div></div>`;
+}
+
+function renderRotChart() {
+  const dados = [...allRot].sort((a,b)=>a.periodo>b.periodo?1:-1).slice(-24);
+  const labels = dados.map(r => { const [y,m]=(r.periodo||'').split('-'); return (MESES_NOME[parseInt(m)]||m)?.slice(0,3)+'/'+( y||'').slice(2); });
+  if (chartRot) chartRot.destroy();
+  chartRot = new Chart(document.getElementById('chartRot'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'% Turnover', data: dados.map(r=>r.percentual||0), backgroundColor:'#1a8fe3', borderRadius:4, yAxisID:'y' },
+      { label:'Admissões',  data: dados.map(r=>r.admissoes||0),  backgroundColor:'#00a878', borderRadius:4, yAxisID:'y2', type:'line', tension:0.3, pointRadius:3 },
+      { label:'Demissões',  data: dados.map(r=>r.demissoes||0),  backgroundColor:'#e53e3e', borderRadius:4, yAxisID:'y2', type:'line', tension:0.3, pointRadius:3 }
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:10, padding:12 } } },
+      scales:{ y:{ position:'left', ticks:{ callback:v=>v+'%' } }, y2:{ position:'right', grid:{ drawOnChartArea:false }, ticks:{ stepSize:1 } } } }
+  });
+}
+
+function renderRotTable() {
+  const ano = document.getElementById('rotAnoFilter')?.value || new Date().getFullYear();
+  const lista = allRot.filter(r=>(r.periodo||'').startsWith(String(ano))).sort((a,b)=>a.periodo>b.periodo?1:-1);
+  const wrap = document.getElementById('rotTableWrap');
+  if (!lista.length) { wrap.innerHTML=`<div class="empty-state">Nenhum registro para ${ano}<br>Clique em "+ Adicionar Mês" ou importe o Excel.</div>`; return; }
+  const cor = p => p > 5 ? 'badge-red' : p > 3 ? 'badge-orange' : 'badge-green';
+  wrap.innerHTML = `<table class="table"><thead><tr>
+    <th>Mês/Ano</th><th>Demissões</th><th>Admissões</th><th>Total Colaboradores</th><th>% Turnover</th><th></th>
+  </tr></thead><tbody>${lista.map(r=>{
+    const [y,m]=(r.periodo||'').split('-');
+    const lbl=(MESES_NOME[parseInt(m)]||m)+'/'+y;
+    const perc=(r.percentual||0).toFixed(2);
+    return `<tr>
+      <td><strong>${lbl}</strong></td>
+      <td style="color:#e53e3e">${r.demissoes||0}</td>
+      <td style="color:#00a878">${r.admissoes||0}</td>
+      <td>${r.total_colaboradores||0}</td>
+      <td><span class="badge ${cor(r.percentual||0)}">${perc}%</span></td>
+      <td><div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-outline" onclick='editRot("${r.id}")'>Editar</button>
+        <button class="btn btn-sm btn-danger"  onclick='deleteRot("${r.id}")'>Excluir</button>
+      </div></td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function calcRotPerc() {
+  const dem   = parseFloat(document.getElementById('rotDemissoes').value)||0;
+  const adm   = parseFloat(document.getElementById('rotAdmissoes').value)||0;
+  const total = parseFloat(document.getElementById('rotTotal').value)||0;
+  document.getElementById('rotPerc').value = total > 0 ? (((dem + adm) / 2) / total * 100).toFixed(2) : '';
+}
+
+function _contarMovimentos(mes, ano) {
+  const ini = `${ano}-${mes}-01`;
+  const fim = `${ano}-${mes}-31`;
+  const adm = allColabs.filter(c => c.data_admissao >= ini && c.data_admissao <= fim).length;
+  const dem = allColabs.filter(c => c.data_demissao >= ini && c.data_demissao <= fim).length;
+  return { adm, dem };
+}
+
+function openRotModal() {
+  document.getElementById('rotId').value = '';
+  const hoje = new Date();
+  const mes = String(hoje.getMonth()+1).padStart(2,'0');
+  const ano = String(hoje.getFullYear());
+  document.getElementById('rotMes').value = mes;
+  document.getElementById('rotAno').value = ano;
+  // Auto-conta admissões e demissões do mês atual pelos cadastros
+  const { adm, dem } = _contarMovimentos(mes, ano);
+  document.getElementById('rotAdmissoes').value = adm || '';
+  document.getElementById('rotDemissoes').value = dem || '';
+  // Total = colaboradores ativos
+  const totalAtivos = allColabs.filter(c => /^ativ/i.test(c.status)).length;
+  document.getElementById('rotTotal').value = totalAtivos || '';
+  calcRotPerc();
+  document.getElementById('rotModalTitle').textContent = 'Adicionar Mês';
+  document.getElementById('rotModal').classList.add('open');
+}
+
+function editRot(id) {
+  const r = allRot.find(x => x.id === id); if (!r) return;
+  const [y,m] = (r.periodo||'').split('-');
+  document.getElementById('rotId').value        = r.id;
+  document.getElementById('rotMes').value       = m||'01';
+  document.getElementById('rotAno').value       = y||'2026';
+  document.getElementById('rotDemissoes').value = r.demissoes||'';
+  document.getElementById('rotAdmissoes').value = r.admissoes||'';
+  document.getElementById('rotTotal').value     = r.total_colaboradores||'';
+  document.getElementById('rotPerc').value      = r.percentual||'';
+  document.getElementById('rotModalTitle').textContent = 'Editar Mês';
+  document.getElementById('rotModal').classList.add('open');
+}
+
+function closeRotModal() { document.getElementById('rotModal').classList.remove('open'); }
+
+async function saveRot() {
+  const id       = document.getElementById('rotId').value;
+  const mes      = document.getElementById('rotMes').value;
+  const ano      = document.getElementById('rotAno').value;
+  if (!mes || !ano) { toast('Informe mês e ano', 'e'); return; }
+  const periodo  = `${ano}-${mes}`;
+  const demissoes = parseFloat(document.getElementById('rotDemissoes').value)||0;
+  const admissoes = parseFloat(document.getElementById('rotAdmissoes').value)||0;
+  const total     = parseFloat(document.getElementById('rotTotal').value)||0;
+  const percentual = total > 0 ? parseFloat((((demissoes + admissoes) / 2) / total * 100).toFixed(2)) : 0;
+  const payload = { periodo, demissoes, admissoes, total_colaboradores: total, percentual };
+  try {
+    if (id) await db.collection('rotatividade').doc(id).update(payload);
+    else    await db.collection('rotatividade').add(payload);
+    toast(id ? 'Registro atualizado!' : 'Registro salvo!');
+    closeRotModal();
+    await loadRot();
+  } catch(e) { toast('Erro: ' + e.message, 'e'); }
+}
+
+async function deleteRot(id) {
+  if (!confirm('Excluir este registro?')) return;
+  try {
+    await db.collection('rotatividade').doc(id).delete();
+    toast('Registro excluído.');
+    await loadRot();
+  } catch(e) { toast('Erro ao excluir', 'e'); }
+}
+
+function importRotExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const wb = XLSX.read(e.target.result, { type:'array' });
+    const _nn = n => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const abaNome = wb.SheetNames.find(n => _nn(n).includes('rotatividade') || _nn(n).includes('turnover')) || wb.SheetNames[0];
+    const ws = wb.Sheets[abaNome];
+    function norm(s) { return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+    const ref = ws['!ref']||'A1', rng = XLSX.utils.decode_range(ref);
+    const merges = ws['!merges']||[];
+    const G = [];
+    for (let r=rng.s.r;r<=rng.e.r;r++) { G[r]=[]; for (let c=rng.s.c;c<=rng.e.c;c++) { const a=XLSX.utils.encode_cell({r,c}); G[r][c]=ws[a]?ws[a].v:''; } }
+    for (const m of merges) { const v=G[m.s.r]?.[m.s.c]??''; for(let r=m.s.r;r<=m.e.r;r++) for(let c=m.s.c;c<=m.e.c;c++) if(G[r]) G[r][c]=v; }
+    const MESES_KEYS = Object.keys(MESES_MAP);
+    function isMes(v) { const n=norm(String(v)); return n.length>=4 && MESES_KEYS.some(m=>n===m||n.startsWith(m)); }
+    let rowDem=-1, rowAdm=-1, rowTotal=-1, rowPerc=-1, rowMes=-1;
+    for (let r=rng.s.r;r<=rng.e.r;r++) {
+      const row=G[r];
+      for (let c=rng.s.c;c<Math.min(rng.s.c+3,rng.e.c+1);c++) {
+        const lbl=norm(row[c]);
+        if (rowDem  ===-1 && lbl.includes('demiss')) rowDem=r;
+        if (rowAdm  ===-1 && lbl.includes('admiss')) rowAdm=r;
+        if (rowTotal===-1 && (lbl.includes('total') && lbl.includes('colabor'))) rowTotal=r;
+        if (rowPerc ===-1 && lbl.includes('turnover')) rowPerc=r;
+      }
+      if (rowMes===-1 && row.filter(v=>isMes(v)).length>=2) rowMes=r;
+    }
+    if (rowMes===-1) { toast('Linha de meses não encontrada na aba "'+abaNome+'"', 'e'); return; }
+    const periodos=[];
+    for (let c=rng.s.c;c<=rng.e.c;c++) {
+      if (!isMes(G[rowMes][c])) continue;
+      const hn=norm(String(G[rowMes][c]));
+      const mi=hn.match(/([a-z]{4,})(20\d{2})/);
+      if (mi && MESES_MAP[mi[1]]) { periodos.push({c,periodo:`${mi[2]}-${MESES_MAP[mi[1]]}`}); continue; }
+      const mesKey=MESES_KEYS.find(m=>hn===m||hn.startsWith(m)); if (!mesKey) continue;
+      // busca ano na linha acima
+      for (let rr=r-1;rr>=rng.s.r;rr--) { const av=String(G[rr]?.[c]||'').trim(); if (/^20\d{2}$/.test(av)) { periodos.push({c,periodo:`${av}-${MESES_MAP[mesKey]}`}); break; } }
+    }
+    if (!periodos.length) { toast('Períodos não identificados', 'e'); return; }
+    if (allRot.length > 0) {
+      const sub = confirm(`Já existem ${allRot.length} registros.\n\nOK = SUBSTITUIR\nCancelar = ADICIONAR`);
+      if (sub) { const batch=db.batch(); allRot.forEach(r=>batch.delete(db.collection('rotatividade').doc(r.id))); await batch.commit(); }
+    }
+    let importados=0, erros=0;
+    for (const {c,periodo} of periodos) {
+      const demissoes = parseFloat(rowDem  >=0 ? G[rowDem][c]   : 0)||0;
+      const admissoes = parseFloat(rowAdm  >=0 ? G[rowAdm][c]   : 0)||0;
+      const total     = parseFloat(rowTotal>=0 ? G[rowTotal][c] : 0)||0;
+      const percentual = total>0 ? parseFloat((((demissoes+admissoes)/2)/total*100).toFixed(2)) : 0;
+      try { await db.collection('rotatividade').add({periodo,demissoes,admissoes,total_colaboradores:total,percentual}); importados++; } catch(err){erros++;}
+    }
+    toast(`${importados} mês(es) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
+    input.value=''; await loadRot();
   };
   reader.readAsArrayBuffer(file);
 }
