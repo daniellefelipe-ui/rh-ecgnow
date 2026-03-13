@@ -1054,92 +1054,102 @@ function importAbsExcel(input) {
   reader.onload = async function(e) {
     const wb  = XLSX.read(e.target.result, { type:'array' });
     const ws  = wb.Sheets[wb.SheetNames[0]];
-    const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
-    if (!raw.length) { toast('Planilha vazia', 'e'); return; }
 
     function norm(s) {
       return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     }
 
-    const MESES_KEYS = Object.keys(MESES_MAP); // ['janeiro','fevereiro','marco',...]
+    // ── Lê a planilha expandindo células mescladas ──────────
+    const ref    = ws['!ref'] || 'A1';
+    const rng    = XLSX.utils.decode_range(ref);
+    const merges = ws['!merges'] || [];
 
-    function isMes(s) {
-      const n = norm(String(s));
-      return MESES_KEYS.some(m => n === m || n.startsWith(m + '2') || n.includes(m));
+    // Monta grade completa
+    const G = [];
+    for (let r = rng.s.r; r <= rng.e.r; r++) {
+      G[r] = [];
+      for (let c = rng.s.c; c <= rng.e.c; c++) {
+        const addr = XLSX.utils.encode_cell({r, c});
+        G[r][c] = ws[addr] ? ws[addr].v : '';
+      }
+    }
+    // Propaga valores de células mescladas
+    for (const m of merges) {
+      const val = G[m.s.r]?.[m.s.c] ?? '';
+      for (let r = m.s.r; r <= m.e.r; r++)
+        for (let c = m.s.c; c <= m.e.c; c++)
+          if (G[r]) G[r][c] = val;
     }
 
-    // ── Encontra linhas de dados (busca em TODAS as colunas)
-    let rowFaltas=-1, rowAtrasos=-1, rowHoras=-1, rowPerc=-1;
-    let rowMes=-1, rowAno=-1;
+    // ── Busca linhas importantes ────────────────────────────
+    const MESES_KEYS = Object.keys(MESES_MAP);
 
-    for (let i = 0; i < raw.length; i++) {
-      // Verifica todos os campos da linha para encontrar labels conhecidos
-      for (let c = 0; c < Math.min(raw[i].length, 3); c++) {
-        const lbl = norm(raw[i][c]||'');
-        if (rowFaltas  === -1 && (lbl.includes('falta') || lbl.includes('atestado'))) rowFaltas  = i;
-        if (rowAtrasos === -1 && lbl.includes('atraso'))                               rowAtrasos = i;
-        if (rowHoras   === -1 && lbl.includes('hora') && lbl.includes('contrat'))      rowHoras   = i;
-        if (rowPerc    === -1 && (lbl === '%ab' || lbl === '% ab' || (lbl.startsWith('%') && lbl.length < 10) || lbl === '% absenteismo')) rowPerc = i;
+    function isMes(v) {
+      const n = norm(String(v));
+      return n.length >= 4 && MESES_KEYS.some(m => n === m || n.startsWith(m));
+    }
+
+    let rowFaltas=-1, rowAtrasos=-1, rowHoras=-1, rowPerc=-1, rowMes=-1, rowAno=-1;
+
+    for (let r = rng.s.r; r <= rng.e.r; r++) {
+      const row = G[r];
+      // Label da linha (primeiras 3 colunas)
+      for (let c = rng.s.c; c < Math.min(rng.s.c + 3, rng.e.c + 1); c++) {
+        const lbl = norm(row[c]);
+        if (rowFaltas  === -1 && (lbl.includes('falta') || lbl.includes('atestado'))) rowFaltas  = r;
+        if (rowAtrasos === -1 && lbl.includes('atraso'))                               rowAtrasos = r;
+        if (rowHoras   === -1 && lbl.includes('hora') && lbl.includes('contrat'))      rowHoras   = r;
+        if (rowPerc    === -1 && (lbl.startsWith('%') || lbl === 'ab' || (lbl.includes('%') && lbl.length < 12))) rowPerc = r;
       }
-      // Detecta linha de meses: pelo menos 3 células com nome de mês
-      if (rowMes === -1) {
-        const mCount = raw[i].filter(c => isMes(c)).length;
-        if (mCount >= 3) rowMes = i;
-      }
-      // Detecta linha de anos: pelo menos 3 células com ano entre 2000-2099
+      // Linha de anos: >= 2 células com "20XX"
       if (rowAno === -1) {
-        const aCount = raw[i].filter(c => /^20\d{2}$/.test(String(c).trim())).length;
-        if (aCount >= 3) rowAno = i;
+        const ac = row.filter(v => /^20\d{2}$/.test(String(v).trim())).length;
+        if (ac >= 2) rowAno = r;
       }
-    }
-
-    // Fallback: % ab pode estar em linha com "ab" no label curto
-    if (rowPerc === -1) {
-      for (let i = 0; i < raw.length; i++) {
-        const lbl = norm(raw[i][0]||'');
-        if (lbl.includes('%') || (lbl.startsWith('ab') && lbl.length < 15)) { rowPerc = i; break; }
+      // Linha de meses: >= 2 células com nomes de mês
+      if (rowMes === -1) {
+        const mc = row.filter(v => isMes(v)).length;
+        if (mc >= 2) rowMes = r;
       }
     }
 
     if (rowMes === -1) {
-      toast('Linha de meses não encontrada. Verifique se a planilha tem os nomes dos meses (janeiro, fevereiro...)', 'e');
+      let dbg = 'DEBUG — primeiras 5 linhas (cols 0-7):\n';
+      for (let ri = rng.s.r; ri <= Math.min(rng.s.r+4, rng.e.r); ri++) {
+        const vals = [];
+        for (let ci = rng.s.c; ci <= Math.min(rng.s.c+7, rng.e.c); ci++) {
+          const v = G[ri]?.[ci];
+          vals.push(JSON.stringify(v) + '(' + typeof v + ')');
+        }
+        dbg += `R${ri}: ${vals.join(' | ')}\n`;
+      }
+      alert(dbg);
       return;
     }
 
-    // ── Mapeia cada coluna para um período YYYY-MM
-    // Descobre o offset inicial (qual índice de coluna começa os dados)
-    const dataColStart = raw[rowMes].findIndex(c => isMes(c));
-    const numCols = raw[rowMes].length;
-
-    // Preenche anos da linha de anos (trata células mescladas — propaga o último valor encontrado)
-    let anosFilled = [];
-    if (rowAno >= 0) {
-      let lastAno = '';
-      for (let c = 0; c < numCols; c++) {
-        const v = String(raw[rowAno][c]||'').trim();
-        if (/^20\d{2}$/.test(v)) lastAno = v;
-        anosFilled.push(lastAno);
-      }
-    }
-
+    // ── Monta mapa coluna → período ─────────────────────────
     const periodos = [];
-    for (let c = dataColStart; c < numCols; c++) {
-      const hn = norm(String(raw[rowMes][c]));
-      // Tenta extrair mês e ano do próprio cabeçalho (ex: "janeiro2023")
-      const mi = hn.match(/([a-z]+)(20\d{2})/);
-      if (mi && MESES_MAP[mi[1]]) { periodos.push({ col: c, periodo: `${mi[2]}-${MESES_MAP[mi[1]]}` }); continue; }
-      // Usa nome do mês + ano da linha de anos
-      const mesNum = MESES_KEYS.find(m => hn.includes(m));
-      const ano = anosFilled[c] || (rowAno >= 0 ? String(raw[rowAno][c]||'').trim() : '');
-      if (mesNum && MESES_MAP[mesNum] && /^20\d{2}$/.test(ano)) {
-        periodos.push({ col: c, periodo: `${ano}-${MESES_MAP[mesNum]}` });
+    for (let c = rng.s.c; c <= rng.e.c; c++) {
+      if (!isMes(G[rowMes][c])) continue;
+      const hn = norm(String(G[rowMes][c]));
+
+      // Formato combinado: "janeiro2023"
+      const mi = hn.match(/([a-z]{4,})(20\d{2})/);
+      if (mi && MESES_MAP[mi[1]]) { periodos.push({ c, periodo: `${mi[2]}-${MESES_MAP[mi[1]]}` }); continue; }
+
+      // Só nome do mês → busca ano na linha de anos (já expandida por merge)
+      const mesKey = MESES_KEYS.find(m => hn === m || hn.startsWith(m));
+      if (!mesKey) continue;
+      const anoVal = rowAno >= 0 ? String(G[rowAno][c]||'').trim() : '';
+      if (/^20\d{2}$/.test(anoVal)) {
+        periodos.push({ c, periodo: `${anoVal}-${MESES_MAP[mesKey]}` });
       }
     }
 
-    if (!periodos.length) { toast('Não foi possível identificar os períodos (mês+ano)', 'e'); return; }
+    if (!periodos.length) { toast('Períodos (mês+ano) não identificados', 'e'); return; }
 
     if (allAbs.length > 0) {
-      const sub = confirm(`Já existem ${allAbs.length} registros de absenteísmo.\n\nOK = SUBSTITUIR tudo\nCancelar = ADICIONAR`);
+      const sub = confirm(`Já existem ${allAbs.length} registros.\n\nOK = SUBSTITUIR\nCancelar = ADICIONAR`);
       if (sub) {
         const batch = db.batch();
         allAbs.forEach(r => batch.delete(db.collection('absenteismo').doc(r.id)));
@@ -1148,11 +1158,11 @@ function importAbsExcel(input) {
     }
 
     let importados = 0, erros = 0;
-    for (const { col, periodo } of periodos) {
-      const faltas  = parseFloat(rowFaltas  >= 0 ? raw[rowFaltas][col]  : 0)||0;
-      const atrasos = parseFloat(rowAtrasos >= 0 ? raw[rowAtrasos][col] : 0)||0;
-      const horas   = parseFloat(rowHoras   >= 0 ? raw[rowHoras][col]   : 0)||0;
-      let   perc    = parseFloat(rowPerc    >= 0 ? String(raw[rowPerc][col]).replace('%','').replace(',','.') : 0)||0;
+    for (const { c, periodo } of periodos) {
+      const faltas  = parseFloat(rowFaltas  >= 0 ? G[rowFaltas][c]  : 0)||0;
+      const atrasos = parseFloat(rowAtrasos >= 0 ? G[rowAtrasos][c] : 0)||0;
+      const horas   = parseFloat(rowHoras   >= 0 ? G[rowHoras][c]   : 0)||0;
+      let   perc    = parseFloat(rowPerc    >= 0 ? String(G[rowPerc][c]).replace('%','').replace(',','.') : 0)||0;
       if (!perc && horas > 0) perc = parseFloat(((faltas+atrasos)/horas*100).toFixed(2));
       try {
         await db.collection('absenteismo').add({ periodo, faltas, atrasos, horas_contratadas: horas, percentual: perc });
