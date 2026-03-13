@@ -1053,11 +1053,11 @@ function importAbsExcel(input) {
   const reader = new FileReader();
   reader.onload = async function(e) {
     const wb  = XLSX.read(e.target.result, { type:'array' });
-    // Procura pela aba correta: "Absenteísmo", "Faltas e Atestados" ou similar
-    const abaNome = wb.SheetNames.find(n => {
-      const nn = n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      return nn.includes('absenteismo') || nn === 'faltas e atestados' || nn.startsWith('faltas');
-    }) || wb.SheetNames[0];
+    // Procura pela aba "Absenteísmo" (resumo mensal), evitando "Semanal"
+    const _nn = n => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const abaNome = wb.SheetNames.find(n => _nn(n) === 'absenteismo')
+                 || wb.SheetNames.find(n => _nn(n).includes('absenteismo') && !_nn(n).includes('semanal'))
+                 || wb.SheetNames[0];
     const ws  = wb.Sheets[abaNome];
 
     function norm(s) {
@@ -1119,7 +1119,7 @@ function importAbsExcel(input) {
     }
 
     if (rowMes === -1) {
-      let dbg = `Abas: ${wb.SheetNames.join(', ')}\nAba lida: ${wb.SheetNames[0]}\n\nLinhas (cols 0-12):\n`;
+      let dbg = `Abas: ${wb.SheetNames.join(', ')}\nAba lida: ${abaNome}\n\nLinhas (cols 0-12):\n`;
       for (let ri = rng.s.r; ri <= Math.min(rng.s.r+7, rng.e.r); ri++) {
         const vals = [];
         for (let ci = rng.s.c; ci <= Math.min(rng.s.c+12, rng.e.c); ci++) {
