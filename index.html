@@ -4,23 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RH · ECGNow</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; font-family: 'DM Sans', sans-serif; font-size: 14px; background: #f5f7fa; color: #1a2535; }
 
-    /* ── Login ─────────────────────────────── */
-    .login-page {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #0a2d4a 0%, #0b4e7d 100%);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .login-box {
-      background: white; border-radius: 16px; padding: 48px 40px;
-      width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
+    .login-page { min-height: 100vh; background: linear-gradient(135deg, #0a2d4a 0%, #0b4e7d 100%); display: flex; align-items: center; justify-content: center; }
+    .login-box { background: white; border-radius: 16px; padding: 48px 40px; width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
     .login-logo { font-family: 'Plus Jakarta Sans',sans-serif; font-size: 28px; font-weight: 800; color: #0a2d4a; text-align: center; margin-bottom: 6px; }
     .login-logo span { color: #1a8fe3; }
     .login-sub { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 32px; }
@@ -32,13 +26,8 @@
     .login-btn:hover { background: #0d6aa8; }
     .login-error { color: #e05555; font-size: 12px; text-align: center; margin-top: 12px; min-height: 18px; }
 
-    /* ── App layout ─────────────────────────── */
     .app { display: flex; min-height: 100vh; }
-    .sidebar {
-      width: 220px; min-width: 220px; background: #0a2d4a;
-      padding: 28px 14px 24px; display: flex; flex-direction: column; gap: 24px;
-      position: sticky; top: 0; height: 100vh; overflow-y: auto;
-    }
+    .sidebar { width: 220px; min-width: 220px; background: #0a2d4a; padding: 28px 14px 24px; display: flex; flex-direction: column; gap: 24px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
     .logo { font-family: 'Plus Jakarta Sans',sans-serif; font-weight: 800; font-size: 17px; color: #fff; padding: 0 8px; display: flex; align-items: center; gap: 8px; }
     .logo span { color: #63b3ed; }
     .logo::before { content: ''; width: 8px; height: 8px; border-radius: 2px; background: #63b3ed; display: inline-block; flex-shrink: 0; }
@@ -53,26 +42,21 @@
     .logout-btn { width: 100%; padding: 9px 12px; border-radius: 8px; font-size: 12px; color: rgba(255,255,255,.4); cursor: pointer; border: 1px solid rgba(255,255,255,.1); background: transparent; font-family: 'DM Sans',sans-serif; transition: all .15s; text-align: left; }
     .logout-btn:hover { color: #e05555; border-color: rgba(224,85,85,.3); }
 
-    /* ── Main ───────────────────────────────── */
     .main { flex: 1; padding: 36px 44px; overflow: auto; }
     .page-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
     .page-header h1 { font-family: 'Plus Jakarta Sans',sans-serif; font-weight: 800; font-size: 22px; color: #0a2d4a; }
 
-    /* ── KPI ────────────────────────────────── */
-    .kpi-grid   { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px; }
-    .kpi-grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 18px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px; }
     .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 22px; position: relative; overflow: hidden; }
     .kpi-card::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #0b4e7d; border-radius: 12px 0 0 12px; }
     .kpi-lbl { font-size: 9px; font-weight: 600; letter-spacing: 1.8px; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; }
     .kpi-val { font-family: 'Plus Jakarta Sans',sans-serif; font-size: 28px; font-weight: 800; color: #0a2d4a; line-height: 1; }
     .kpi-sub { font-size: 11px; color: #94a3b8; margin-top: 8px; }
 
-    /* ── Card ───────────────────────────────── */
     .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
     .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px; }
     .card-title { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #0b4e7d; }
 
-    /* ── Buttons ────────────────────────────── */
     .btn { padding: 8px 18px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; font-family: 'DM Sans',sans-serif; transition: all .15s; }
     .btn-primary { background: #0b4e7d; color: white; }
     .btn-primary:hover { background: #0d6aa8; }
@@ -82,14 +66,12 @@
     .btn-outline:hover { background: #eff6ff; }
     .btn-sm { padding: 5px 12px; font-size: 11px; }
 
-    /* ── Table ──────────────────────────────── */
     .table { width: 100%; border-collapse: collapse; }
     .table th { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #94a3b8; padding: 0 12px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
     .table td { padding: 12px; font-size: 13px; color: #4a5568; border-bottom: 1px solid #f0f4f8; }
     .table tr:last-child td { border-bottom: none; }
     .table tr:hover td { background: #f8fafc; }
 
-    /* ── Badge ──────────────────────────────── */
     .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; }
     .badge-green  { background: #f0fdf4; color: #166534; }
     .badge-red    { background: #fef2f2; color: #b91c1c; }
@@ -97,7 +79,6 @@
     .badge-orange { background: #fffbeb; color: #92400e; }
     .badge-purple { background: #faf5ff; color: #6b21a8; }
 
-    /* ── Modal ──────────────────────────────── */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 100; align-items: center; justify-content: center; }
     .modal-overlay.open { display: flex; }
     .modal { background: white; border-radius: 16px; padding: 32px; width: 580px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
@@ -106,27 +87,23 @@
     .modal-close { background: none; border: none; font-size: 22px; color: #94a3b8; cursor: pointer; line-height: 1; padding: 0; }
     .modal-close:hover { color: #e05555; }
 
-    /* ── Form ───────────────────────────────── */
-    .form-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .form-group  { display: flex; flex-direction: column; gap: 6px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
     .form-group.full { grid-column: 1 / -1; }
-    .form-label  { font-size: 11px; font-weight: 600; color: #4a5568; text-transform: uppercase; letter-spacing: .05em; }
+    .form-label { font-size: 11px; font-weight: 600; color: #4a5568; text-transform: uppercase; letter-spacing: .05em; }
     .form-input, .form-select { padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: 'DM Sans',sans-serif; color: #1a2535; outline: none; transition: border-color .2s; background: white; width: 100%; }
     .form-input:focus, .form-select:focus { border-color: #1a8fe3; }
     .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
 
-    /* ── Section ────────────────────────────── */
     .page-section { display: none; }
     .page-section.active { display: block; }
 
-    /* ── Misc ───────────────────────────────── */
     .empty-state { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; }
     .search-bar { padding: 8px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: 'DM Sans',sans-serif; outline: none; width: 240px; transition: border-color .2s; }
     .search-bar:focus { border-color: #1a8fe3; }
     .charts-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
     .currency { font-family: 'Plus Jakarta Sans',sans-serif; font-weight: 600; }
 
-    /* ── Toast ──────────────────────────────── */
     #toast { position: fixed; bottom: 24px; right: 24px; padding: 13px 22px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 999; display: none; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
     #toast.show-s { display: flex; background: #0b4e7d; color: white; }
     #toast.show-e { display: flex; background: #e05555; color: white; }
@@ -138,7 +115,6 @@
 </head>
 <body>
 
-<!-- ═══ LOGIN ═══════════════════════════════════════════ -->
 <div id="loginPage" class="login-page">
   <div class="login-box">
     <div class="login-logo">RH<span>.</span>ECGNow</div>
@@ -156,17 +132,15 @@
   </div>
 </div>
 
-<!-- ═══ APP ══════════════════════════════════════════════ -->
 <div id="appPage" class="app" style="display:none">
-
   <aside class="sidebar">
     <div class="logo">RH<span>.</span>ECGNow</div>
     <div>
       <div class="sb-label">Menu</div>
       <nav class="sb-nav">
-        <button class="nav-item active"  onclick="showSection('dashboard',this)">🏠 &nbsp;Dashboard</button>
-        <button class="nav-item"         onclick="showSection('colaboradores',this)">👤 &nbsp;Colaboradores</button>
-        <button class="nav-item"         onclick="showSection('headcount',this)">💰 &nbsp;Headcount</button>
+        <button class="nav-item active" onclick="showSection('dashboard',this)">🏠 &nbsp;Dashboard</button>
+        <button class="nav-item"        onclick="showSection('colaboradores',this)">👤 &nbsp;Colaboradores</button>
+        <button class="nav-item"        onclick="showSection('headcount',this)">💰 &nbsp;Headcount</button>
         <button class="nav-item" disabled>📋 &nbsp;Absenteísmo</button>
         <button class="nav-item" disabled>🔄 &nbsp;Rotatividade</button>
         <button class="nav-item" disabled>🎯 &nbsp;Recrutamento</button>
@@ -182,8 +156,6 @@
   </aside>
 
   <main class="main">
-
-    <!-- DASHBOARD -->
     <section class="page-section active" id="sec-dashboard">
       <div class="page-header"><h1>Dashboard</h1></div>
       <div class="kpi-grid" id="dashKpis">
@@ -201,7 +173,6 @@
       </div>
     </section>
 
-    <!-- COLABORADORES -->
     <section class="page-section" id="sec-colaboradores">
       <div class="page-header"><h1>Colaboradores</h1></div>
       <div class="card">
@@ -216,7 +187,6 @@
       </div>
     </section>
 
-    <!-- HEADCOUNT -->
     <section class="page-section" id="sec-headcount">
       <div class="page-header"><h1>Headcount</h1></div>
       <div class="kpi-grid" id="headcountKpis">
@@ -235,11 +205,10 @@
         <div id="hcTableWrap"><div class="empty-state">Carregando...</div></div>
       </div>
     </section>
-
   </main>
 </div>
 
-<!-- ═══ MODAL COLABORADOR ═════════════════════════════════ -->
+<!-- MODAL COLABORADOR -->
 <div class="modal-overlay" id="colabModal">
   <div class="modal">
     <div class="modal-header">
@@ -296,7 +265,7 @@
   </div>
 </div>
 
-<!-- ═══ MODAL HEADCOUNT ══════════════════════════════════ -->
+<!-- MODAL HEADCOUNT -->
 <div class="modal-overlay" id="hcModal">
   <div class="modal" style="width:640px">
     <div class="modal-header">
@@ -372,17 +341,23 @@
 <div id="toast"></div>
 
 <script>
-const SUPABASE_URL = 'https://zeaohxrzswesgjjusem.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InplYW9ob3hyenN3ZXNnamp1c2VtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MDUxOTcsImV4cCI6MjA4ODk4MTE5N30.asZp_o2-glRXgsYcha4LgU8aXzUfK0QZE7tQ1WOMrpM';
-const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+firebase.initializeApp({
+  apiKey: "AIzaSyBopJe43OvWuA-vuHWGCTqQ_ApreNf_kWA",
+  authDomain: "rh-ecgnow.firebaseapp.com",
+  projectId: "rh-ecgnow",
+  storageBucket: "rh-ecgnow.firebasestorage.app",
+  messagingSenderId: "130728187614",
+  appId: "1:130728187614:web:bb1fb39b10be2119c7d44f"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
 
 // ── Auth ──────────────────────────────────────────────────
-db.auth.onAuthStateChange((event, session) => {
-  if (session) {
+auth.onAuthStateChanged(user => {
+  if (user) {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('appPage').style.display  = 'flex';
-    document.getElementById('userEmail').textContent  = session.user.email;
+    document.getElementById('userEmail').textContent  = user.email;
     loadAll();
   } else {
     document.getElementById('loginPage').style.display = 'flex';
@@ -395,13 +370,14 @@ async function login() {
   const password = document.getElementById('loginPassword').value;
   document.getElementById('loginError').textContent = '';
   if (!email || !password) { document.getElementById('loginError').textContent = 'Preencha e-mail e senha.'; return; }
-  const { error } = await db.auth.signInWithPassword({ email, password });
-  if (error) document.getElementById('loginError').textContent = 'E-mail ou senha incorretos.';
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+  } catch(e) {
+    document.getElementById('loginError').textContent = 'E-mail ou senha incorretos.';
+  }
 }
 
-async function logout() {
-  await db.auth.signOut();
-}
+async function logout() { await auth.signOut(); }
 
 // ── Navigation ────────────────────────────────────────────
 function showSection(name, btn) {
@@ -413,21 +389,16 @@ function showSection(name, btn) {
 
 // ── Toast ─────────────────────────────────────────────────
 let toastTimer;
-function toast(msg, type = 's') {
+function toast(msg, type='s') {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'show-' + type;
+  el.textContent = msg; el.className = 'show-' + type;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = ''; }, 3000);
 }
 
-// ── Currency ──────────────────────────────────────────────
-function fmt(v) {
-  return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
-}
-function n(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function fmt(v) { return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+function n(id)  { return parseFloat(document.getElementById(id).value) || 0; }
 
-// ── Load all ──────────────────────────────────────────────
 let allColabs = [], allHc = [];
 let chartTipo = null, chartSetor = null;
 
@@ -438,12 +409,13 @@ async function loadAll() {
 
 // ══ COLABORADORES ══════════════════════════════════════════
 async function loadColabs() {
-  const { data, error } = await db.from('colaboradores').select('*').order('nome');
-  if (error) { toast('Erro ao carregar colaboradores', 'e'); return; }
-  allColabs = data || [];
-  renderColabTable(allColabs);
-  populateHcColab();
-  buildDashboard();
+  try {
+    const snap = await db.collection('colaboradores').orderBy('nome').get();
+    allColabs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderColabTable(allColabs);
+    populateHcColab();
+    buildDashboard();
+  } catch(e) { toast('Erro ao carregar colaboradores', 'e'); }
 }
 
 function renderColabTable(list) {
@@ -453,36 +425,27 @@ function renderColabTable(list) {
     return;
   }
   const tipoClass = { PJ:'badge-orange', CLT:'badge-blue', 'Estágio':'badge-purple', Prolabore:'badge-green' };
-  wrap.innerHTML = `
-    <table class="table">
-      <thead><tr>
-        <th>Nome</th><th>Setor</th><th>Cargo</th><th>Contrato</th><th>Gênero</th><th>Admissão</th><th>Status</th><th></th>
-      </tr></thead>
-      <tbody>
-        ${list.map(c => `
-          <tr>
-            <td><strong style="color:#1a2535">${c.nome}</strong></td>
-            <td>${c.setor||'—'}</td>
-            <td>${c.cargo||'—'}</td>
-            <td><span class="badge ${tipoClass[c.tipo_contrato]||'badge-green'}">${c.tipo_contrato||'—'}</span></td>
-            <td>${c.genero==='F'?'♀ Fem':c.genero==='M'?'♂ Mas':'—'}</td>
-            <td>${c.data_admissao ? new Date(c.data_admissao+'T12:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-            <td><span class="badge ${c.status==='Ativo'?'badge-green':'badge-red'}">${c.status}</span></td>
-            <td>
-              <div style="display:flex;gap:6px">
-                <button class="btn btn-sm btn-outline" onclick='editColab("${c.id}")'>Editar</button>
-                <button class="btn btn-sm btn-danger"  onclick='deleteColab("${c.id}","${c.nome.replace(/"/g,'\\"')}")'>Excluir</button>
-              </div>
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
+  wrap.innerHTML = `<table class="table">
+    <thead><tr><th>Nome</th><th>Setor</th><th>Cargo</th><th>Contrato</th><th>Gênero</th><th>Admissão</th><th>Status</th><th></th></tr></thead>
+    <tbody>${list.map(c => `<tr>
+      <td><strong style="color:#1a2535">${c.nome}</strong></td>
+      <td>${c.setor||'—'}</td>
+      <td>${c.cargo||'—'}</td>
+      <td><span class="badge ${tipoClass[c.tipo_contrato]||'badge-green'}">${c.tipo_contrato||'—'}</span></td>
+      <td>${c.genero==='F'?'♀ Fem':c.genero==='M'?'♂ Mas':'—'}</td>
+      <td>${c.data_admissao||'—'}</td>
+      <td><span class="badge ${c.status==='Ativo'?'badge-green':'badge-red'}">${c.status}</span></td>
+      <td><div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-outline" onclick='editColab("${c.id}")'>Editar</button>
+        <button class="btn btn-sm btn-danger"  onclick='deleteColab("${c.id}","${(c.nome||'').replace(/"/g,'\\"')}")'>Excluir</button>
+      </div></td>
+    </tr>`).join('')}</tbody></table>`;
 }
 
 function filterColabs(q) {
   const f = q.toLowerCase();
   renderColabTable(allColabs.filter(c =>
-    c.nome.toLowerCase().includes(f) ||
+    (c.nome||'').toLowerCase().includes(f) ||
     (c.setor||'').toLowerCase().includes(f) ||
     (c.cargo||'').toLowerCase().includes(f)
   ));
@@ -520,29 +483,30 @@ async function saveColab() {
   if (!nome) { toast('Informe o nome do colaborador', 'e'); return; }
   const payload = {
     nome,
-    setor:          document.getElementById('colabSetor').value.trim()||null,
-    cargo:          document.getElementById('colabCargo').value.trim()||null,
-    tipo_contrato:  document.getElementById('colabTipo').value||null,
-    status:         document.getElementById('colabStatus').value,
-    genero:         document.getElementById('colabGenero').value||null,
-    data_admissao:  document.getElementById('colabAdmissao').value||null,
-    data_demissao:  document.getElementById('colabDemissao').value||null,
+    setor:         document.getElementById('colabSetor').value.trim()||'',
+    cargo:         document.getElementById('colabCargo').value.trim()||'',
+    tipo_contrato: document.getElementById('colabTipo').value||'',
+    status:        document.getElementById('colabStatus').value,
+    genero:        document.getElementById('colabGenero').value||'',
+    data_admissao: document.getElementById('colabAdmissao').value||'',
+    data_demissao: document.getElementById('colabDemissao').value||'',
   };
-  const { error } = id
-    ? await db.from('colaboradores').update(payload).eq('id', id)
-    : await db.from('colaboradores').insert(payload);
-  if (error) { toast('Erro ao salvar: ' + error.message, 'e'); return; }
-  toast(id ? 'Colaborador atualizado!' : 'Colaborador cadastrado!');
-  closeColabModal();
-  await loadColabs();
+  try {
+    if (id) await db.collection('colaboradores').doc(id).update(payload);
+    else    await db.collection('colaboradores').add(payload);
+    toast(id ? 'Colaborador atualizado!' : 'Colaborador cadastrado!');
+    closeColabModal();
+    await loadColabs();
+  } catch(e) { toast('Erro: ' + e.message, 'e'); }
 }
 
 async function deleteColab(id, nome) {
   if (!confirm(`Excluir "${nome}"?\nEsta ação não pode ser desfeita.`)) return;
-  const { error } = await db.from('colaboradores').delete().eq('id', id);
-  if (error) { toast('Erro ao excluir', 'e'); return; }
-  toast('Colaborador excluído.');
-  await loadColabs();
+  try {
+    await db.collection('colaboradores').doc(id).delete();
+    toast('Colaborador excluído.');
+    await loadColabs();
+  } catch(e) { toast('Erro ao excluir', 'e'); }
 }
 
 // ══ HEADCOUNT ══════════════════════════════════════════════
@@ -559,14 +523,14 @@ function populateHcColab() {
 }
 
 async function loadHeadcount() {
-  const ano = document.getElementById('hcAnoFilter').value;
-  const { data, error } = await db.from('headcount')
-    .select('*, colaboradores(nome, tipo_contrato)')
-    .eq('ano', ano);
-  if (error) { toast('Erro ao carregar headcount', 'e'); return; }
-  allHc = (data||[]).sort((a,b) => (a.colaboradores?.nome||'').localeCompare(b.colaboradores?.nome||''));
-  renderHcKpis(allHc, ano);
-  renderHcTable(allHc, ano);
+  const ano = parseInt(document.getElementById('hcAnoFilter').value);
+  try {
+    const snap = await db.collection('headcount').where('ano','==',ano).get();
+    allHc = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allHc.sort((a,b) => (a.colaborador_nome||'').localeCompare(b.colaborador_nome||''));
+    renderHcKpis(allHc, ano);
+    renderHcTable(allHc, ano);
+  } catch(e) { toast('Erro ao carregar headcount', 'e'); }
 }
 
 function custoMensal(r) {
@@ -577,12 +541,11 @@ function custoMensal(r) {
 
 function renderHcKpis(hc, ano) {
   const totalM = hc.reduce((s,r) => s + custoMensal(r), 0);
-  const totalA = totalM * 12;
-  const pj  = hc.filter(r => r.colaboradores?.tipo_contrato === 'PJ').length;
-  const clt = hc.filter(r => r.colaboradores?.tipo_contrato === 'CLT').length;
+  const pj  = hc.filter(r => r.tipo_contrato === 'PJ').length;
+  const clt = hc.filter(r => r.tipo_contrato === 'CLT').length;
   document.getElementById('headcountKpis').innerHTML = `
     <div class="kpi-card"><div class="kpi-lbl">Custo Mensal · ${ano}</div><div class="kpi-val" style="font-size:19px;color:#0b4e7d">${fmt(totalM)}</div><div class="kpi-sub">${hc.length} colaboradores</div></div>
-    <div class="kpi-card"><div class="kpi-lbl">Custo Anual · ${ano}</div><div class="kpi-val" style="font-size:19px;color:#0b4e7d">${fmt(totalA)}</div><div class="kpi-sub">projeção anual</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Custo Anual · ${ano}</div><div class="kpi-val" style="font-size:19px;color:#0b4e7d">${fmt(totalM*12)}</div><div class="kpi-sub">projeção anual</div></div>
     <div class="kpi-card"><div class="kpi-lbl">PJ</div><div class="kpi-val">${pj}</div><div class="kpi-sub">colaboradores PJ</div></div>
     <div class="kpi-card"><div class="kpi-lbl">CLT</div><div class="kpi-val">${clt}</div><div class="kpi-sub">colaboradores CLT</div></div>`;
 }
@@ -594,68 +557,57 @@ function renderHcTable(hc, ano) {
     wrap.innerHTML = `<div class="empty-state">Nenhum registro para ${ano}.<br><small>Clique em "+ Adicionar" para inserir.</small></div>`;
     return;
   }
-  wrap.innerHTML = `
-    <table class="table">
-      <thead><tr>
-        <th>Colaborador</th><th>Contrato</th><th>Salário Bruto</th><th>Benefícios</th><th>Férias + 13°</th><th>Outros</th><th>Custo Mensal</th><th>Custo Anual</th><th></th>
-      </tr></thead>
-      <tbody>
-        ${hc.map(r => {
-          const mensal  = custoMensal(r);
-          const benef   = (r.beneficios||0)+(r.vale_home||0)+(r.seguro_saude||0)+(r.seguranca_trabalho||0);
-          const f13     = (r.ferias||0)+(r.decimo_terceiro||0)+(r.impostos_ferias_13||0);
-          const outros  = (r.posicao_gowork||0)+(r.impostos||0);
-          const tc      = r.colaboradores?.tipo_contrato;
-          return `
-            <tr>
-              <td><strong style="color:#1a2535">${r.colaboradores?.nome||'—'}</strong></td>
-              <td><span class="badge ${tc==='CLT'?'badge-blue':'badge-orange'}">${tc||'—'}</span></td>
-              <td class="currency">${fmt(r.salario_bruto)}</td>
-              <td class="currency">${fmt(benef)}</td>
-              <td class="currency">${fmt(f13)}</td>
-              <td class="currency">${fmt(outros)}</td>
-              <td><strong class="currency" style="color:#0b4e7d">${fmt(mensal)}</strong></td>
-              <td class="currency">${fmt(mensal*12)}</td>
-              <td>
-                <div style="display:flex;gap:6px">
-                  <button class="btn btn-sm btn-outline" onclick='editHc("${r.id}")'>Editar</button>
-                  <button class="btn btn-sm btn-danger"  onclick='deleteHc("${r.id}")'>Excluir</button>
-                </div>
-              </td>
-            </tr>`;
-        }).join('')}
-      </tbody>
-    </table>`;
+  wrap.innerHTML = `<table class="table">
+    <thead><tr><th>Colaborador</th><th>Contrato</th><th>Salário Bruto</th><th>Benefícios</th><th>Férias + 13°</th><th>Outros</th><th>Custo Mensal</th><th>Custo Anual</th><th></th></tr></thead>
+    <tbody>${hc.map(r => {
+      const mensal = custoMensal(r);
+      const benef  = (r.beneficios||0)+(r.vale_home||0)+(r.seguro_saude||0)+(r.seguranca_trabalho||0);
+      const f13    = (r.ferias||0)+(r.decimo_terceiro||0)+(r.impostos_ferias_13||0);
+      const outros = (r.posicao_gowork||0)+(r.impostos||0);
+      const tc     = r.tipo_contrato||'—';
+      return `<tr>
+        <td><strong style="color:#1a2535">${r.colaborador_nome||'—'}</strong></td>
+        <td><span class="badge ${tc==='CLT'?'badge-blue':'badge-orange'}">${tc}</span></td>
+        <td class="currency">${fmt(r.salario_bruto)}</td>
+        <td class="currency">${fmt(benef)}</td>
+        <td class="currency">${fmt(f13)}</td>
+        <td class="currency">${fmt(outros)}</td>
+        <td><strong class="currency" style="color:#0b4e7d">${fmt(mensal)}</strong></td>
+        <td class="currency">${fmt(mensal*12)}</td>
+        <td><div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-outline" onclick='editHc("${r.id}")'>Editar</button>
+          <button class="btn btn-sm btn-danger"  onclick='deleteHc("${r.id}")'>Excluir</button>
+        </div></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
 }
-
-const hcFields = ['Salario','Impostos','Beneficios','ValeHome','Seguranca','Ferias','13','ImpostosF13','Gowork','SeguroSaude'];
 
 function openHcModal() {
   document.getElementById('hcId').value    = '';
   document.getElementById('hcColab').value = '';
   document.getElementById('hcAno').value   = '2026';
   document.getElementById('hcIdade').value = '';
-  hcFields.forEach(f => document.getElementById('hc'+f).value = '');
+  ['hcSalario','hcImpostos','hcBeneficios','hcValeHome','hcSeguranca','hcFerias','hc13','hcImpostosF13','hcGowork','hcSeguroSaude'].forEach(f => document.getElementById(f).value = '');
   document.getElementById('hcModalTitle').textContent = 'Adicionar Headcount';
   document.getElementById('hcModal').classList.add('open');
 }
 
 function editHc(id) {
   const r = allHc.find(x => x.id === id); if (!r) return;
-  document.getElementById('hcId').value        = r.id;
-  document.getElementById('hcColab').value     = r.colaborador_id;
-  document.getElementById('hcAno').value       = r.ano;
-  document.getElementById('hcIdade').value     = r.idade||'';
-  document.getElementById('hcSalario').value   = r.salario_bruto||'';
-  document.getElementById('hcImpostos').value  = r.impostos||'';
-  document.getElementById('hcBeneficios').value= r.beneficios||'';
-  document.getElementById('hcValeHome').value  = r.vale_home||'';
-  document.getElementById('hcSeguranca').value = r.seguranca_trabalho||'';
-  document.getElementById('hcFerias').value    = r.ferias||'';
-  document.getElementById('hc13').value        = r.decimo_terceiro||'';
-  document.getElementById('hcImpostosF13').value= r.impostos_ferias_13||'';
-  document.getElementById('hcGowork').value    = r.posicao_gowork||'';
-  document.getElementById('hcSeguroSaude').value= r.seguro_saude||'';
+  document.getElementById('hcId').value          = r.id;
+  document.getElementById('hcColab').value       = r.colaborador_id||'';
+  document.getElementById('hcAno').value         = r.ano||'2026';
+  document.getElementById('hcIdade').value       = r.idade||'';
+  document.getElementById('hcSalario').value     = r.salario_bruto||'';
+  document.getElementById('hcImpostos').value    = r.impostos||'';
+  document.getElementById('hcBeneficios').value  = r.beneficios||'';
+  document.getElementById('hcValeHome').value    = r.vale_home||'';
+  document.getElementById('hcSeguranca').value   = r.seguranca_trabalho||'';
+  document.getElementById('hcFerias').value      = r.ferias||'';
+  document.getElementById('hc13').value          = r.decimo_terceiro||'';
+  document.getElementById('hcImpostosF13').value = r.impostos_ferias_13||'';
+  document.getElementById('hcGowork').value      = r.posicao_gowork||'';
+  document.getElementById('hcSeguroSaude').value = r.seguro_saude||'';
   document.getElementById('hcModalTitle').textContent = 'Editar Headcount';
   document.getElementById('hcModal').classList.add('open');
 }
@@ -666,46 +618,50 @@ async function saveHc() {
   const id  = document.getElementById('hcId').value;
   const cid = document.getElementById('hcColab').value;
   if (!cid) { toast('Selecione o colaborador', 'e'); return; }
+  const colab = allColabs.find(c => c.id === cid);
   const payload = {
-    colaborador_id:    cid,
-    ano:               parseInt(document.getElementById('hcAno').value),
-    idade:             parseInt(document.getElementById('hcIdade').value)||null,
-    salario_bruto:     n('hcSalario'),
-    impostos:          n('hcImpostos'),
-    beneficios:        n('hcBeneficios'),
-    vale_home:         n('hcValeHome'),
-    seguranca_trabalho:n('hcSeguranca'),
-    ferias:            n('hcFerias'),
-    decimo_terceiro:   n('hc13'),
-    impostos_ferias_13:n('hcImpostosF13'),
-    posicao_gowork:    n('hcGowork'),
-    seguro_saude:      n('hcSeguroSaude'),
+    colaborador_id:     cid,
+    colaborador_nome:   colab ? colab.nome : '',
+    tipo_contrato:      colab ? colab.tipo_contrato : '',
+    ano:                parseInt(document.getElementById('hcAno').value),
+    idade:              parseInt(document.getElementById('hcIdade').value)||0,
+    salario_bruto:      n('hcSalario'),
+    impostos:           n('hcImpostos'),
+    beneficios:         n('hcBeneficios'),
+    vale_home:          n('hcValeHome'),
+    seguranca_trabalho: n('hcSeguranca'),
+    ferias:             n('hcFerias'),
+    decimo_terceiro:    n('hc13'),
+    impostos_ferias_13: n('hcImpostosF13'),
+    posicao_gowork:     n('hcGowork'),
+    seguro_saude:       n('hcSeguroSaude'),
   };
-  const { error } = id
-    ? await db.from('headcount').update(payload).eq('id', id)
-    : await db.from('headcount').insert(payload);
-  if (error) { toast('Erro: ' + error.message, 'e'); return; }
-  toast(id ? 'Headcount atualizado!' : 'Headcount adicionado!');
-  closeHcModal();
-  await loadHeadcount();
+  try {
+    if (id) await db.collection('headcount').doc(id).update(payload);
+    else    await db.collection('headcount').add(payload);
+    toast(id ? 'Headcount atualizado!' : 'Headcount adicionado!');
+    closeHcModal();
+    await loadHeadcount();
+  } catch(e) { toast('Erro: ' + e.message, 'e'); }
 }
 
 async function deleteHc(id) {
   if (!confirm('Excluir este registro?')) return;
-  const { error } = await db.from('headcount').delete().eq('id', id);
-  if (error) { toast('Erro ao excluir', 'e'); return; }
-  toast('Registro excluído.');
-  await loadHeadcount();
+  try {
+    await db.collection('headcount').doc(id).delete();
+    toast('Registro excluído.');
+    await loadHeadcount();
+  } catch(e) { toast('Erro ao excluir', 'e'); }
 }
 
 // ══ DASHBOARD ══════════════════════════════════════════════
 function buildDashboard() {
   const ativos   = allColabs.filter(c => c.status === 'Ativo');
   const inativos = allColabs.filter(c => c.status !== 'Ativo');
-  const pj  = ativos.filter(c => c.tipo_contrato === 'PJ').length;
-  const clt = ativos.filter(c => c.tipo_contrato === 'CLT').length;
-  const fem = ativos.filter(c => c.genero === 'F').length;
-  const masc= ativos.filter(c => c.genero === 'M').length;
+  const pj   = ativos.filter(c => c.tipo_contrato === 'PJ').length;
+  const clt  = ativos.filter(c => c.tipo_contrato === 'CLT').length;
+  const fem  = ativos.filter(c => c.genero === 'F').length;
+  const masc = ativos.filter(c => c.genero === 'M').length;
 
   document.getElementById('dashKpis').innerHTML = `
     <div class="kpi-card"><div class="kpi-lbl">Total Colaboradores</div><div class="kpi-val">${ativos.length}</div><div class="kpi-sub">ativos · ${inativos.length} inativos</div></div>
@@ -713,7 +669,6 @@ function buildDashboard() {
     <div class="kpi-card"><div class="kpi-lbl">CLT</div><div class="kpi-val">${clt}</div><div class="kpi-sub">${ativos.length?(clt/ativos.length*100).toFixed(1):0}% do total</div></div>
     <div class="kpi-card"><div class="kpi-lbl">Gênero</div><div class="kpi-val" style="font-size:20px">${fem}F · ${masc}M</div><div class="kpi-sub">feminino · masculino</div></div>`;
 
-  // Tipo contrato
   const tipos = {};
   ativos.forEach(c => { const t = c.tipo_contrato||'N/A'; tipos[t]=(tipos[t]||0)+1; });
   if (chartTipo) chartTipo.destroy();
@@ -723,7 +678,6 @@ function buildDashboard() {
     options: { cutout:'62%', plugins: { legend: { position:'bottom', labels:{ font:{size:11}, boxWidth:10, padding:12 } } } }
   });
 
-  // Setor
   const setores = {};
   ativos.forEach(c => { const s = c.setor||'N/A'; setores[s]=(setores[s]||0)+1; });
   if (chartSetor) chartSetor.destroy();
