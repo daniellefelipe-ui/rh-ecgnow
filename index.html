@@ -146,7 +146,7 @@
         <button class="nav-item" onclick="showSection('rotatividade',this)">🔄 &nbsp;Rotatividade</button>
         <button class="nav-item" onclick="showSection('recrutamento',this)">🎯 &nbsp;Recrutamento</button>
         <button class="nav-item" onclick="showSection('treinamentos',this)">📚 &nbsp;Treinamentos</button>
-        <button class="nav-item" disabled>💬 &nbsp;e-NPS</button>
+        <button class="nav-item" onclick="showSection('enps',this)">💬 &nbsp;e-NPS</button>
         <button class="nav-item" disabled>⭐ &nbsp;e-SAT</button>
       </nav>
     </div>
@@ -330,6 +330,28 @@
         <div id="treinTableWrap"><div class="empty-state">Carregando...</div></div>
       </div>
     </section>
+
+    <section class="page-section" id="sec-enps">
+      <div class="page-header"><h1>e-NPS</h1></div>
+      <div class="kpi-grid" id="enpsKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">Evolução do e-NPS</span></div>
+        <canvas id="chartEnps" height="110"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Histórico de Pesquisas</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="document.getElementById('enpsExcelInput').click()">📥 Importar Excel</button>
+            <input type="file" id="enpsExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importEnpsExcel(this)">
+            <button class="btn btn-primary" onclick="openEnpsModal()">+ Adicionar Pesquisa</button>
+          </div>
+        </div>
+        <div id="enpsTableWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -456,6 +478,64 @@
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeAbsModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveAbs()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL e-NPS -->
+<div class="modal-overlay" id="enpsModal">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <span class="modal-title" id="enpsModalTitle">Adicionar Pesquisa e-NPS</span>
+      <button class="modal-close" onclick="closeEnpsModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <input type="hidden" id="enpsId">
+      <div class="form-group">
+        <label class="form-label">Mês *</label>
+        <select class="form-select" id="enpsMes">
+          <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+          <option value="03">Março</option><option value="04">Abril</option>
+          <option value="05">Maio</option><option value="06">Junho</option>
+          <option value="07">Julho</option><option value="08">Agosto</option>
+          <option value="09">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ano *</label>
+        <select class="form-select" id="enpsAno">
+          <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Notas dos colaboradores (0-10, separadas por vírgula ou espaço)</label>
+        <textarea class="form-input" id="enpsNotas" rows="4" placeholder="Ex: 10, 10, 9, 8, 10, 7, 10..." oninput="calcEnps()" style="resize:vertical"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Promotores (9-10)</label>
+        <input type="number" class="form-input" id="enpsPromo" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Neutros (7-8)</label>
+        <input type="number" class="form-input" id="enpsNeutro" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Detratores (0-6)</label>
+        <input type="number" class="form-input" id="enpsDetrat" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+      <div class="form-group">
+        <label class="form-label">e-NPS <span style="font-weight:400;color:#888">(calculado)</span></label>
+        <input type="number" class="form-input" id="enpsScore" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Zona</label>
+        <input type="text" class="form-input" id="enpsZona" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeEnpsModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveEnps()">Salvar</button>
     </div>
   </div>
 </div>
@@ -920,8 +1000,8 @@ function calcTempoCasa(admissao, demissao, status) {
   return anos + ' ano' + (anos !== 1 ? 's' : '') + (m > 0 ? ' e ' + m + ' mes' + (m !== 1 ? 'es' : '') : '');
 }
 
-let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [], allTrein = [];
-let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null;
+let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [], allTrein = [], allEnps = [];
+let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null, chartEnps = null;
 
 async function loadAll() {
   await loadColabs();
@@ -930,6 +1010,7 @@ async function loadAll() {
   await loadRot();
   await loadRec();
   await loadTrein();
+  await loadEnps();
 }
 
 // ══ COLABORADORES ══════════════════════════════════════════
@@ -2175,6 +2256,223 @@ function importTreinExcel(input) {
     }
     toast(`${importados} treinamento(s) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
     input.value=''; await loadTrein();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══ e-NPS ═══════════════════════════════════════════════════
+function _enpsZona(score) {
+  if (score > 75) return 'Zona de Encantamento';
+  if (score > 50) return 'Zona de Qualidade';
+  if (score > 0)  return 'Zona de Aperfeiçoamento';
+  return 'Zona Crítica';
+}
+function _enpsZonaCor(zona) {
+  if (zona === 'Zona de Encantamento') return 'badge-green';
+  if (zona === 'Zona de Qualidade')    return 'badge-blue';
+  if (zona === 'Zona de Aperfeiçoamento') return 'badge-orange';
+  return 'badge-red';
+}
+function _calcEnpsFromNotas(notas) {
+  const valid = notas.filter(n => n >= 0 && n <= 10);
+  if (!valid.length) return { promotores:0, neutros:0, detratores:0, score:0, total:0 };
+  const promotores  = valid.filter(n => n >= 9).length;
+  const neutros     = valid.filter(n => n >= 7 && n <= 8).length;
+  const detratores  = valid.filter(n => n <= 6).length;
+  const score       = Math.round((promotores - detratores) / valid.length * 100);
+  return { promotores, neutros, detratores, score, total: valid.length };
+}
+
+async function loadEnps() {
+  try {
+    const snap = await db.collection('enps').orderBy('periodo').get();
+    allEnps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderEnpsKpis();
+    renderEnpsChart();
+    renderEnpsTable();
+  } catch(e) { console.error('loadEnps', e); }
+}
+
+function renderEnpsKpis() {
+  const ultimo = allEnps[allEnps.length - 1] || {};
+  const [y,m]  = (ultimo.periodo||'').split('-');
+  const lblUlt = m ? MESES_NOME[parseInt(m)] + '/' + y : ultimo.periodo||'—';
+  const zona   = ultimo.zona || '—';
+  const corZona = ultimo.zona ? _enpsZonaCor(ultimo.zona) : '';
+  const mediaGeral = allEnps.length ? Math.round(allEnps.reduce((s,r)=>s+(r.score||0),0)/allEnps.length) : '—';
+  const totalResp  = allEnps.reduce((s,r)=>s+(r.total_respostas||0),0);
+  const totalPromo = allEnps.reduce((s,r)=>s+(r.promotores||0),0);
+  document.getElementById('enpsKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">e-NPS · ${lblUlt}</div><div class="kpi-val" style="color:#0b4e7d">${ultimo.score??'—'}</div><div class="kpi-sub"><span class="badge ${corZona}">${zona}</span></div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Média Geral</div><div class="kpi-val" style="color:#0b4e7d">${mediaGeral}</div><div class="kpi-sub">${allEnps.length} pesquisas realizadas</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Total Respostas</div><div class="kpi-val">${totalResp.toLocaleString('pt-BR')}</div><div class="kpi-sub">em todas as pesquisas</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Promotores (total)</div><div class="kpi-val" style="color:#00a878">${totalPromo}</div><div class="kpi-sub">notas 9 e 10</div></div>`;
+}
+
+function renderEnpsChart() {
+  const dados = [...allEnps].sort((a,b)=>a.periodo>b.periodo?1:-1);
+  const labels = dados.map(r => { const [y,m]=(r.periodo||'').split('-'); return (MESES_NOME[parseInt(m)]||m)?.slice(0,3)+'/'+( y||'').slice(2); });
+  const cores  = dados.map(r => r.score > 75 ? '#00a878' : r.score > 50 ? '#1a8fe3' : r.score > 0 ? '#d97706' : '#e53e3e');
+  if (chartEnps) chartEnps.destroy();
+  chartEnps = new Chart(document.getElementById('chartEnps'), {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'e-NPS', data: dados.map(r=>r.score||0), backgroundColor: cores, borderRadius:6 }] },
+    options:{ responsive:true, plugins:{ legend:{ display:false },
+      annotation:{ annotations:{ line75:{ type:'line', yMin:75, yMax:75, borderColor:'#00a878', borderWidth:1, borderDash:[4,4] },
+        line50:{ type:'line', yMin:50, yMax:50, borderColor:'#1a8fe3', borderWidth:1, borderDash:[4,4] },
+        line0:{ type:'line', yMin:0, yMax:0, borderColor:'#e53e3e', borderWidth:1 } } } },
+      scales:{ y:{ min:-100, max:100 } } }
+  });
+}
+
+function renderEnpsTable() {
+  const wrap = document.getElementById('enpsTableWrap');
+  if (!allEnps.length) { wrap.innerHTML=`<div class="empty-state">Nenhuma pesquisa registrada.<br>Clique em "+ Adicionar Pesquisa" ou importe o Excel.</div>`; return; }
+  const lista = [...allEnps].sort((a,b)=>b.periodo>a.periodo?1:-1);
+  wrap.innerHTML = `<table class="table"><thead><tr>
+    <th>Período</th><th>Respostas</th><th>Promotores</th><th>Neutros</th><th>Detratores</th><th>e-NPS</th><th>Zona</th><th></th>
+  </tr></thead><tbody>${lista.map(r=>{
+    const [y,m]=(r.periodo||'').split('-');
+    const lbl=(MESES_NOME[parseInt(m)]||m)+'/'+y;
+    const cor = r.score > 75?'badge-green':r.score>50?'badge-blue':r.score>0?'badge-orange':'badge-red';
+    return `<tr>
+      <td><strong>${lbl}</strong></td>
+      <td>${r.total_respostas||0}</td>
+      <td style="color:#00a878">${r.promotores||0}</td>
+      <td>${r.neutros||0}</td>
+      <td style="color:#e53e3e">${r.detratores||0}</td>
+      <td><strong>${r.score??'—'}</strong></td>
+      <td><span class="badge ${cor}">${r.zona||'—'}</span></td>
+      <td><div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-outline" onclick='editEnps("${r.id}")'>Editar</button>
+        <button class="btn btn-sm btn-danger"  onclick='deleteEnps("${r.id}")'>Excluir</button>
+      </div></td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function calcEnps() {
+  const raw = document.getElementById('enpsNotas').value;
+  const notas = raw.split(/[\s,;]+/).map(Number).filter(n => !isNaN(n));
+  const { promotores, neutros, detratores, score, total } = _calcEnpsFromNotas(notas);
+  document.getElementById('enpsPromo').value   = total ? promotores : '';
+  document.getElementById('enpsNeutro').value  = total ? neutros    : '';
+  document.getElementById('enpsDetrat').value  = total ? detratores : '';
+  document.getElementById('enpsScore').value   = total ? score      : '';
+  document.getElementById('enpsZona').value    = total ? _enpsZona(score) : '';
+}
+
+function openEnpsModal() {
+  document.getElementById('enpsId').value = '';
+  document.getElementById('enpsNotas').value = '';
+  ['enpsPromo','enpsNeutro','enpsDetrat','enpsScore','enpsZona'].forEach(id=>document.getElementById(id).value='');
+  const hoje = new Date();
+  document.getElementById('enpsMes').value = String(hoje.getMonth()+1).padStart(2,'0');
+  document.getElementById('enpsAno').value = String(hoje.getFullYear());
+  document.getElementById('enpsModalTitle').textContent = 'Adicionar Pesquisa e-NPS';
+  document.getElementById('enpsModal').classList.add('open');
+}
+
+function editEnps(id) {
+  const r = allEnps.find(x=>x.id===id); if (!r) return;
+  const [y,m] = (r.periodo||'').split('-');
+  document.getElementById('enpsId').value    = r.id;
+  document.getElementById('enpsMes').value   = m||'01';
+  document.getElementById('enpsAno').value   = y||'2026';
+  document.getElementById('enpsNotas').value = (r.notas||[]).join(', ');
+  document.getElementById('enpsPromo').value  = r.promotores||'';
+  document.getElementById('enpsNeutro').value = r.neutros||'';
+  document.getElementById('enpsDetrat').value = r.detratores||'';
+  document.getElementById('enpsScore').value  = r.score??'';
+  document.getElementById('enpsZona').value   = r.zona||'';
+  document.getElementById('enpsModalTitle').textContent = 'Editar Pesquisa';
+  document.getElementById('enpsModal').classList.add('open');
+}
+
+function closeEnpsModal() { document.getElementById('enpsModal').classList.remove('open'); }
+
+async function saveEnps() {
+  const id  = document.getElementById('enpsId').value;
+  const mes = document.getElementById('enpsMes').value;
+  const ano = document.getElementById('enpsAno').value;
+  if (!mes || !ano) { toast('Informe mês e ano','e'); return; }
+  const raw   = document.getElementById('enpsNotas').value;
+  const notas = raw.split(/[\s,;]+/).map(Number).filter(n => !isNaN(n) && n >= 0 && n <= 10);
+  if (!notas.length) { toast('Informe ao menos uma nota (0-10)','e'); return; }
+  const { promotores, neutros, detratores, score, total } = _calcEnpsFromNotas(notas);
+  const payload = { periodo:`${ano}-${mes}`, notas, promotores, neutros, detratores,
+                    score, zona: _enpsZona(score), total_respostas: total };
+  try {
+    if (id) await db.collection('enps').doc(id).update(payload);
+    else    await db.collection('enps').add(payload);
+    toast(id ? 'Pesquisa atualizada!' : 'Pesquisa salva!');
+    closeEnpsModal();
+    await loadEnps();
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+async function deleteEnps(id) {
+  if (!confirm('Excluir esta pesquisa?')) return;
+  try {
+    await db.collection('enps').doc(id).delete();
+    toast('Pesquisa excluída.');
+    await loadEnps();
+  } catch(e) { toast('Erro ao excluir','e'); }
+}
+
+function importEnpsExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const wb = XLSX.read(e.target.result, {type:'array'});
+    const _nn = n => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const abaNome = wb.SheetNames.find(n=>_nn(n).includes('nps')) || wb.SheetNames[0];
+    const ws = wb.Sheets[abaNome];
+    const ref = ws['!ref']||'A1', rng = XLSX.utils.decode_range(ref);
+    const merges = ws['!merges']||[];
+    // Monta grade
+    const G = [];
+    for (let r=rng.s.r;r<=rng.e.r;r++) { G[r]=[]; for (let c=rng.s.c;c<=rng.e.c;c++) { const a=XLSX.utils.encode_cell({r,c}); G[r][c]=ws[a]?ws[a].v:''; } }
+    for (const m of merges) { const v=G[m.s.r]?.[m.s.c]??''; for(let r=m.s.r;r<=m.e.r;r++) for(let c=m.s.c;c<=m.e.c;c++) if(G[r]) G[r][c]=v; }
+    // Linha 0 = anos, linha 1 = meses
+    const rowAno = rng.s.r;
+    const rowMes = rng.s.r + 1;
+    const MESES_KEYS = Object.keys(MESES_MAP);
+    function norm(s){ return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+    // Identifica colunas de período
+    const periodos = [];
+    for (let c=rng.s.c;c<=rng.e.c;c++) {
+      const mesVal = norm(G[rowMes][c]||'');
+      const mesKey = MESES_KEYS.find(m=>mesVal===m||mesVal.startsWith(m));
+      if (!mesKey) continue;
+      const anoVal = String(G[rowAno][c]||'').trim();
+      if (/^20\d{2}$/.test(anoVal)) periodos.push({c, periodo:`${anoVal}-${MESES_MAP[mesKey]}`});
+    }
+    if (!periodos.length) { toast('Períodos não encontrados na planilha','e'); return; }
+    // Coleta notas (linhas 2 até penúltima — exclui linha de totais)
+    const dataStart = rng.s.r + 2;
+    const dataEnd   = rng.e.r - 1; // última linha costuma ser o total calculado
+    const registros = periodos.map(({c, periodo}) => {
+      const notas = [];
+      for (let r=dataStart;r<=dataEnd;r++) {
+        const v = G[r][c];
+        const n = parseFloat(String(v).replace(',','.'));
+        if (!isNaN(n) && n >= 0 && n <= 10) notas.push(Math.round(n));
+      }
+      const { promotores, neutros, detratores, score, total } = _calcEnpsFromNotas(notas);
+      return { periodo, notas, promotores, neutros, detratores, score, zona: _enpsZona(score), total_respostas: total };
+    }).filter(r=>r.total_respostas>0);
+    if (!registros.length) { toast('Nenhuma nota válida encontrada','e'); return; }
+    if (allEnps.length > 0) {
+      const sub = confirm(`Já existem ${allEnps.length} pesquisas.\n\nOK = SUBSTITUIR\nCancelar = ADICIONAR`);
+      if (sub) { const batch=db.batch(); allEnps.forEach(r=>batch.delete(db.collection('enps').doc(r.id))); await batch.commit(); }
+    }
+    let importados=0, erros=0;
+    for (const p of registros) {
+      try { await db.collection('enps').add(p); importados++; } catch(err){ erros++; }
+    }
+    toast(`${importados} pesquisa(s) importada(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
+    input.value=''; await loadEnps();
   };
   reader.readAsArrayBuffer(file);
 }
