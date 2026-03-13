@@ -1838,24 +1838,22 @@ function importRecExcel(input) {
     function norm(s){ return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
     function findCol(row, terms){ return Object.keys(row).find(k=>terms.some(t=>norm(k).includes(t)))||null; }
     const sample = rows[0];
-    // DEBUG — mostra colunas e primeira linha
-    alert('Aba: ' + abaNome + '\nColunas: ' + Object.keys(sample).join(' | ') + '\n\nPrimeira linha:\n' + Object.entries(sample).slice(0,6).map(([k,v])=>`${k}: ${v}`).join('\n'));
-    const colProcesso   = findCol(sample,['processo','cargo','vaga']);
-    const colDataIni    = findCol(sample,['data ini','data_ini','inicio','abertura']);
-    const colDataFim    = findCol(sample,['data fin','data_fin','final','fechamento','encerramento']);
-    const colVagas      = findCol(sample,['vaga','num']);
-    const colCurric     = findCol(sample,['curriculo','curriculos receb']);
-    const colTriados    = findCol(sample,['triado']);
-    const colEntrev     = findCol(sample,['entrevista','entrev real']);
-    const colTestes     = findCol(sample,['teste']);
-    const colGestor     = findCol(sample,['gestor']);
+    const colProcesso   = findCol(sample,['processo seletivo','processo','cargo','vaga']);
+    const colDataIni    = findCol(sample,['data ini','data inicial','inicio','abertura']);
+    const colDataFim    = findCol(sample,['data fin','data final','final','fechamento','encerramento']);
+    const colVagas      = findCol(sample,['n\u00ba vaga','num vaga','n vaga','vagas']);
+    const colCurric     = findCol(sample,['curriculo receb','curriculos receb','curriculos']);
+    const colTriados    = findCol(sample,['curriculo tria','triado','triados']);
+    const colEntrev     = findCol(sample,['entrevista realiz','entrevistas realiz','entrev real']);
+    const colTestes     = findCol(sample,['teste prat','testes prat','teste']);
+    const colGestor     = findCol(sample,['gestor','entrevista com gest']);
     const colCont       = findCol(sample,['contrat']);
     const colSit        = findCol(sample,['situa']);
     const colDur        = findCol(sample,['dura']);
-    const colDiv        = findCol(sample,['divulg']);
-    const colHrRec      = findCol(sample,['hora recr','hora_recr']);
-    const colCustoT     = findCol(sample,['custo tot','custo_tot']);
-    const colCustoPor   = findCol(sample,['custo por','custo_por']);
+    const colDiv        = findCol(sample,['divulg','valor div']);
+    const colHrRec      = findCol(sample,['hora recr','hora_recr','hora recrutador']);
+    const colCustoT     = findCol(sample,['custo tot','custo total']);
+    const colCustoPor   = findCol(sample,['custo por','custo_por','custo por contrat']);
     function xdate(v){ if(!v) return ''; if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*86400000)); return d.toISOString().slice(0,10); } return String(v).trim(); }
     function xnum(v){ return parseFloat(String(v).replace('R$','').replace(/\./g,'').replace(',','.').trim())||0; }
     const registros = rows.filter(r => colProcesso && r[colProcesso]).map(r => {
