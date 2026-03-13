@@ -145,7 +145,7 @@
         <button class="nav-item" onclick="showSection('absenteismo',this)">📋 &nbsp;Absenteísmo</button>
         <button class="nav-item" onclick="showSection('rotatividade',this)">🔄 &nbsp;Rotatividade</button>
         <button class="nav-item" onclick="showSection('recrutamento',this)">🎯 &nbsp;Recrutamento</button>
-        <button class="nav-item" disabled>📚 &nbsp;Treinamentos</button>
+        <button class="nav-item" onclick="showSection('treinamentos',this)">📚 &nbsp;Treinamentos</button>
         <button class="nav-item" disabled>💬 &nbsp;e-NPS</button>
         <button class="nav-item" disabled>⭐ &nbsp;e-SAT</button>
       </nav>
@@ -303,6 +303,33 @@
         <div id="recTableWrap"><div class="empty-state">Carregando...</div></div>
       </div>
     </section>
+
+    <section class="page-section" id="sec-treinamentos">
+      <div class="page-header"><h1>Treinamentos</h1></div>
+      <div class="kpi-grid" id="treinKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">Treinamentos por Mês</span></div>
+        <canvas id="chartTreinMes" height="110"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Lista de Treinamentos</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input class="search-bar" type="text" id="treinSearch" placeholder="Buscar treinamento..." oninput="renderTreinTable()">
+            <select class="form-select" id="treinFiltroAno" onchange="renderTreinTable()" style="width:90px;padding:8px 12px;font-size:13px">
+              <option value="">Todos</option>
+              <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+            </select>
+            <button class="btn btn-outline" onclick="document.getElementById('treinExcelInput').click()">📥 Importar Excel</button>
+            <input type="file" id="treinExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importTreinExcel(this)">
+            <button class="btn btn-primary" onclick="openTreinModal()">+ Novo Treinamento</button>
+          </div>
+        </div>
+        <div id="treinTableWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -429,6 +456,57 @@
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeAbsModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveAbs()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TREINAMENTO -->
+<div class="modal-overlay" id="treinModal">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <span class="modal-title" id="treinModalTitle">Novo Treinamento</span>
+      <button class="modal-close" onclick="closeTreinModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <input type="hidden" id="treinId">
+      <div class="form-group full">
+        <label class="form-label">Treinamento *</label>
+        <input type="text" class="form-input" id="treinNome" placeholder="Ex: LGPD, Setembro Amarelo...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ano *</label>
+        <select class="form-select" id="treinAno">
+          <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mês *</label>
+        <select class="form-select" id="treinMes">
+          <option>Janeiro</option><option>Fevereiro</option><option>Março</option><option>Abril</option>
+          <option>Maio</option><option>Junho</option><option>Julho</option><option>Agosto</option>
+          <option>Setembro</option><option>Outubro</option><option>Novembro</option><option>Dezembro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ministrado Por</label>
+        <input type="text" class="form-input" id="treinMinistrado" placeholder="Ex: Danielle">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Duração (minutos)</label>
+        <input type="number" class="form-input" id="treinDuracao" placeholder="Ex: 60" min="1" oninput="calcTreinTotal()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nº Participantes</label>
+        <input type="number" class="form-input" id="treinParticipantes" placeholder="0" min="0" oninput="calcTreinTotal()">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Total de Horas Investidas <span style="font-weight:400;color:#888">(calculado)</span></label>
+        <input type="text" class="form-input" id="treinTotalHoras" placeholder="0h 0min" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeTreinModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveTrein()">Salvar</button>
     </div>
   </div>
 </div>
@@ -842,8 +920,8 @@ function calcTempoCasa(admissao, demissao, status) {
   return anos + ' ano' + (anos !== 1 ? 's' : '') + (m > 0 ? ' e ' + m + ' mes' + (m !== 1 ? 'es' : '') : '');
 }
 
-let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [];
-let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null;
+let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [], allTrein = [];
+let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null;
 
 async function loadAll() {
   await loadColabs();
@@ -851,6 +929,7 @@ async function loadAll() {
   await loadAbs();
   await loadRot();
   await loadRec();
+  await loadTrein();
 }
 
 // ══ COLABORADORES ══════════════════════════════════════════
@@ -1897,6 +1976,205 @@ function importRecExcel(input) {
     }
     toast(`${importados} processo(s) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
     input.value=''; await loadRec();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══ TREINAMENTOS ═══════════════════════════════════════════
+function _mesToNum(mes) {
+  return {janeiro:1,fevereiro:2,marco:3,março:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12}[
+    String(mes).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')] || 0;
+}
+function _minToHM(min) {
+  const h = Math.floor(min/60), m = Math.round(min%60);
+  return h > 0 ? `${h}h ${m > 0 ? m+'min' : ''}`.trim() : `${m}min`;
+}
+function _excelTimeToMin(v) {
+  // Excel armazena tempo como fração do dia (1h = 1/24)
+  if (typeof v === 'number') return Math.round(v * 24 * 60);
+  // Formato "HH:MM:SS" ou "H:MM"
+  const m = String(v).match(/(\d+):(\d+)/);
+  if (m) return parseInt(m[1])*60 + parseInt(m[2]);
+  return 0;
+}
+
+async function loadTrein() {
+  try {
+    const snap = await db.collection('treinamentos').get();
+    allTrein = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allTrein.sort((a,b) => { const ya=a.ano-b.ano||0, ma=_mesToNum(a.mes)-_mesToNum(b.mes); return ya||ma; });
+    renderTreinKpis();
+    renderTreinChart();
+    renderTreinTable();
+  } catch(e) { console.error('loadTrein', e); }
+}
+
+function renderTreinKpis() {
+  const total       = allTrein.length;
+  const participantes = allTrein.reduce((s,r)=>s+(r.participantes||0),0);
+  const totalMin    = allTrein.reduce((s,r)=>s+(r.duracao_min||0)*(r.participantes||0),0);
+  const mediaPart   = total ? (participantes/total).toFixed(1) : '—';
+  const anoAtual    = new Date().getFullYear();
+  const doAno       = allTrein.filter(r=>r.ano==anoAtual);
+  document.getElementById('treinKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">Total de Treinamentos</div><div class="kpi-val">${total}</div><div class="kpi-sub">${doAno.length} em ${anoAtual}</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Total de Participantes</div><div class="kpi-val" style="color:#0b4e7d">${participantes.toLocaleString('pt-BR')}</div><div class="kpi-sub">média ${mediaPart} por treinamento</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Horas Investidas (total)</div><div class="kpi-val" style="color:#00a878">${_minToHM(totalMin)}</div><div class="kpi-sub">participante × duração</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Treinamentos ${anoAtual}</div><div class="kpi-val">${doAno.reduce((s,r)=>s+(r.participantes||0),0)}</div><div class="kpi-sub">participantes no ano</div></div>`;
+}
+
+function renderTreinChart() {
+  const porMes = {};
+  allTrein.forEach(r => {
+    const key = `${r.ano}-${String(_mesToNum(r.mes)).padStart(2,'0')}`;
+    if (!porMes[key]) porMes[key] = { count:0, part:0 };
+    porMes[key].count++;
+    porMes[key].part += r.participantes||0;
+  });
+  const keys = Object.keys(porMes).sort();
+  const labels = keys.map(k => { const [y,m]=k.split('-'); return (MESES_NOME[parseInt(m)]||m).slice(0,3)+'/'+y.slice(2); });
+  if (chartTreinMes) chartTreinMes.destroy();
+  chartTreinMes = new Chart(document.getElementById('chartTreinMes'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Treinamentos', data: keys.map(k=>porMes[k].count), backgroundColor:'#1a8fe3', borderRadius:4, yAxisID:'y' },
+      { label:'Participantes', data: keys.map(k=>porMes[k].part), backgroundColor:'#00a878', borderRadius:4, yAxisID:'y2', type:'line', tension:0.3, pointRadius:3 }
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:10, padding:12 } } },
+      scales:{ y:{ position:'left', ticks:{ stepSize:1 } }, y2:{ position:'right', grid:{ drawOnChartArea:false } } } }
+  });
+}
+
+function renderTreinTable() {
+  const q   = (document.getElementById('treinSearch')?.value||'').toLowerCase();
+  const ano = document.getElementById('treinFiltroAno')?.value||'';
+  const lista = allTrein.filter(r => {
+    if (ano && String(r.ano) !== ano) return false;
+    return !q || (r.nome||'').toLowerCase().includes(q) || (r.ministrado_por||'').toLowerCase().includes(q);
+  });
+  const wrap = document.getElementById('treinTableWrap');
+  if (!lista.length) { wrap.innerHTML=`<div class="empty-state">Nenhum treinamento encontrado.</div>`; return; }
+  wrap.innerHTML = `<table class="table"><thead><tr>
+    <th>Treinamento</th><th>Ano</th><th>Mês</th><th>Ministrado Por</th><th>Duração</th><th>Participantes</th><th>Total Horas</th><th></th>
+  </tr></thead><tbody>${lista.map(r=>`<tr>
+    <td><strong>${r.nome||'—'}</strong></td>
+    <td>${r.ano||'—'}</td>
+    <td>${r.mes||'—'}</td>
+    <td>${r.ministrado_por||'—'}</td>
+    <td>${_minToHM(r.duracao_min||0)}</td>
+    <td>${r.participantes||0}</td>
+    <td>${_minToHM((r.duracao_min||0)*(r.participantes||0))}</td>
+    <td><div style="display:flex;gap:6px">
+      <button class="btn btn-sm btn-outline" onclick='editTrein("${r.id}")'>Editar</button>
+      <button class="btn btn-sm btn-danger"  onclick='deleteTrein("${r.id}")'>Excluir</button>
+    </div></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+function calcTreinTotal() {
+  const dur  = parseFloat(document.getElementById('treinDuracao').value)||0;
+  const part = parseFloat(document.getElementById('treinParticipantes').value)||0;
+  document.getElementById('treinTotalHoras').value = dur > 0 ? _minToHM(dur * part) : '';
+}
+
+function openTreinModal() {
+  document.getElementById('treinId').value = '';
+  ['treinNome','treinMinistrado','treinDuracao','treinParticipantes','treinTotalHoras'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('treinAno').value = String(new Date().getFullYear());
+  document.getElementById('treinMes').value = MESES_NOME[new Date().getMonth()+1];
+  document.getElementById('treinModalTitle').textContent = 'Novo Treinamento';
+  document.getElementById('treinModal').classList.add('open');
+}
+
+function editTrein(id) {
+  const r = allTrein.find(x=>x.id===id); if (!r) return;
+  document.getElementById('treinId').value           = r.id;
+  document.getElementById('treinNome').value         = r.nome||'';
+  document.getElementById('treinAno').value          = r.ano||'2024';
+  document.getElementById('treinMes').value          = r.mes||'Janeiro';
+  document.getElementById('treinMinistrado').value   = r.ministrado_por||'';
+  document.getElementById('treinDuracao').value      = r.duracao_min||'';
+  document.getElementById('treinParticipantes').value= r.participantes||'';
+  document.getElementById('treinTotalHoras').value   = _minToHM((r.duracao_min||0)*(r.participantes||0));
+  document.getElementById('treinModalTitle').textContent = 'Editar Treinamento';
+  document.getElementById('treinModal').classList.add('open');
+}
+
+function closeTreinModal() { document.getElementById('treinModal').classList.remove('open'); }
+
+async function saveTrein() {
+  const id   = document.getElementById('treinId').value;
+  const nome = document.getElementById('treinNome').value.trim();
+  if (!nome) { toast('Informe o nome do treinamento','e'); return; }
+  const dur  = parseInt(document.getElementById('treinDuracao').value)||0;
+  const part = parseInt(document.getElementById('treinParticipantes').value)||0;
+  const payload = {
+    nome,
+    ano:           parseInt(document.getElementById('treinAno').value),
+    mes:           document.getElementById('treinMes').value,
+    ministrado_por:document.getElementById('treinMinistrado').value.trim()||'',
+    duracao_min:   dur,
+    participantes: part,
+    total_horas_min: dur * part,
+  };
+  try {
+    if (id) await db.collection('treinamentos').doc(id).update(payload);
+    else    await db.collection('treinamentos').add(payload);
+    toast(id ? 'Treinamento atualizado!' : 'Treinamento salvo!');
+    closeTreinModal();
+    await loadTrein();
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+async function deleteTrein(id) {
+  if (!confirm('Excluir este treinamento?')) return;
+  try {
+    await db.collection('treinamentos').doc(id).delete();
+    toast('Treinamento excluído.');
+    await loadTrein();
+  } catch(e) { toast('Erro ao excluir','e'); }
+}
+
+function importTreinExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const wb = XLSX.read(e.target.result, {type:'array'});
+    const _nn = n => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const abaNome = wb.SheetNames.find(n=>_nn(n).includes('treinamento')) || wb.SheetNames[0];
+    const ws = wb.Sheets[abaNome];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+    if (!rows.length) { toast('Planilha vazia','e'); return; }
+    function norm(s){ return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+    function findCol(row,terms){ return Object.keys(row).find(k=>terms.some(t=>norm(k).includes(t)))||null; }
+    const s = rows[0];
+    const colNome  = findCol(s,['treinamento','nome','curso']);
+    const colAno   = findCol(s,['ano']);
+    const colMes   = findCol(s,['mes','mês']);
+    const colMin   = findCol(s,['ministrado','ministr']);
+    const colDur   = findCol(s,['duracao','duração','dura']);
+    const colPart  = findCol(s,['participante','quant']);
+    if (!colNome) { toast('Coluna "Treinamento" não encontrada','e'); return; }
+    const registros = rows.filter(r=>r[colNome]).map(r => {
+      const durMin = _excelTimeToMin(colDur ? r[colDur] : 0);
+      const part   = parseInt(colPart ? r[colPart] : 0)||0;
+      const mesRaw = colMes ? String(r[colMes]).trim() : '';
+      const anoRaw = colAno ? parseInt(r[colAno]) : 0;
+      return { nome: String(r[colNome]).trim(), ano: anoRaw||new Date().getFullYear(),
+               mes: mesRaw, ministrado_por: colMin ? String(r[colMin]).trim() : '',
+               duracao_min: durMin, participantes: part, total_horas_min: durMin*part };
+    }).filter(r=>r.nome);
+    if (!registros.length) { toast('Nenhum treinamento encontrado','e'); return; }
+    if (allTrein.length > 0) {
+      const sub = confirm(`Já existem ${allTrein.length} registros.\n\nOK = SUBSTITUIR\nCancelar = ADICIONAR`);
+      if (sub) { const batch=db.batch(); allTrein.forEach(r=>batch.delete(db.collection('treinamentos').doc(r.id))); await batch.commit(); }
+    }
+    let importados=0, erros=0;
+    for (const p of registros) {
+      try { await db.collection('treinamentos').add(p); importados++; } catch(err){ erros++; }
+    }
+    toast(`${importados} treinamento(s) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
+    input.value=''; await loadTrein();
   };
   reader.readAsArrayBuffer(file);
 }
