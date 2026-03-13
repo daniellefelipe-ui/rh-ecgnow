@@ -142,7 +142,7 @@
         <button class="nav-item active" onclick="showSection('dashboard',this)">🏠 &nbsp;Dashboard</button>
         <button class="nav-item"        onclick="showSection('colaboradores',this)">👤 &nbsp;Colaboradores</button>
         <button class="nav-item"        onclick="showSection('headcount',this)">💰 &nbsp;Headcount</button>
-        <button class="nav-item" disabled>📋 &nbsp;Absenteísmo</button>
+        <button class="nav-item" onclick="showSection('absenteismo',this)">📋 &nbsp;Absenteísmo</button>
         <button class="nav-item" disabled>🔄 &nbsp;Rotatividade</button>
         <button class="nav-item" disabled>🎯 &nbsp;Recrutamento</button>
         <button class="nav-item" disabled>📚 &nbsp;Treinamentos</button>
@@ -206,6 +206,31 @@
           </div>
         </div>
         <div id="hcTableWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
+
+    <section class="page-section" id="sec-absenteismo">
+      <div class="page-header"><h1>Absenteísmo</h1></div>
+      <div class="kpi-grid" id="absKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">% Absenteísmo por Mês</span></div>
+        <canvas id="chartAbs" height="110"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Histórico Mensal</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <select class="form-select" id="absAnoFilter" onchange="renderAbsTable()" style="width:100px">
+              <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+            </select>
+            <button class="btn btn-outline" onclick="document.getElementById('absExcelInput').click()">📥 Importar Excel</button>
+            <input type="file" id="absExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importAbsExcel(this)">
+            <button class="btn btn-primary" onclick="openAbsModal()">+ Adicionar Mês</button>
+          </div>
+        </div>
+        <div id="absTableWrap"><div class="empty-state">Carregando...</div></div>
       </div>
     </section>
   </main>
@@ -280,6 +305,56 @@
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeColabModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveColab()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ABSENTEÍSMO -->
+<div class="modal-overlay" id="absModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <span class="modal-title" id="absModalTitle">Adicionar Mês</span>
+      <button class="modal-close" onclick="closeAbsModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <input type="hidden" id="absId">
+      <div class="form-group">
+        <label class="form-label">Mês *</label>
+        <select class="form-select" id="absMes">
+          <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+          <option value="03">Março</option><option value="04">Abril</option>
+          <option value="05">Maio</option><option value="06">Junho</option>
+          <option value="07">Julho</option><option value="08">Agosto</option>
+          <option value="09">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ano *</label>
+        <select class="form-select" id="absAno">
+          <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Faltas e Atestados (horas)</label>
+        <input type="number" class="form-input" id="absFaltas" placeholder="0" step="0.1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Total de Atrasos (horas)</label>
+        <input type="number" class="form-input" id="absAtrasos" placeholder="0" step="0.1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Total de Horas Contratadas</label>
+        <input type="number" class="form-input" id="absHoras" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">% Absenteísmo</label>
+        <input type="number" class="form-input" id="absPerc" placeholder="0.00" step="0.01">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeAbsModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveAbs()">Salvar</button>
     </div>
   </div>
 </div>
@@ -560,12 +635,13 @@ function calcTempoCasa(admissao, demissao, status) {
   return anos + ' ano' + (anos !== 1 ? 's' : '') + (m > 0 ? ' e ' + m + ' mes' + (m !== 1 ? 'es' : '') : '');
 }
 
-let allColabs = [], allHc = [];
-let chartTipo = null, chartSetor = null;
+let allColabs = [], allHc = [], allAbs = [];
+let chartTipo = null, chartSetor = null, chartAbs = null;
 
 async function loadAll() {
   await loadColabs();
   await loadHeadcount();
+  await loadAbs();
 }
 
 // ══ COLABORADORES ══════════════════════════════════════════
@@ -826,6 +902,231 @@ async function deleteHc(id) {
     toast('Registro excluído.');
     await loadHeadcount();
   } catch(e) { toast('Erro ao excluir', 'e'); }
+}
+
+// ══ ABSENTEÍSMO ════════════════════════════════════════════
+const MESES_NOME = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MESES_MAP  = {janeiro:'01',fevereiro:'02',marco:'03','março':'03',abril:'04',maio:'05',junho:'06',julho:'07',agosto:'08',setembro:'09',outubro:'10',novembro:'11',dezembro:'12'};
+
+async function loadAbs() {
+  try {
+    const snap = await db.collection('absenteismo').orderBy('periodo').get();
+    allAbs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAbsKpis();
+    renderAbsChart();
+    renderAbsTable();
+  } catch(e) { console.error(e); }
+}
+
+function renderAbsKpis() {
+  if (!allAbs.length) {
+    document.getElementById('absKpis').innerHTML = '<div class="kpi-card"><div class="kpi-lbl">Sem dados</div><div class="kpi-val">—</div></div>';
+    return;
+  }
+  const anoAtual = new Date().getFullYear();
+  const doAno = allAbs.filter(r => r.periodo && r.periodo.startsWith(String(anoAtual)));
+  const ultimo = allAbs[allAbs.length - 1];
+  const mediaAno = doAno.length ? (doAno.reduce((s,r)=>s+(r.percentual||0),0)/doAno.length).toFixed(2) : '—';
+  const totalFaltas = doAno.reduce((s,r)=>s+(r.faltas||0),0).toFixed(1);
+  const totalHoras  = doAno.reduce((s,r)=>s+(r.horas_contratadas||0),0);
+  const [y,m] = (ultimo.periodo||'').split('-');
+  const lblUlt = m ? MESES_NOME[parseInt(m)] + '/' + y : ultimo.periodo;
+  document.getElementById('absKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">% Abs · ${lblUlt}</div><div class="kpi-val" style="color:#0b4e7d">${ultimo.percentual?.toFixed(2)||'—'}%</div><div class="kpi-sub">último mês registrado</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Média ${anoAtual}</div><div class="kpi-val" style="color:#0b4e7d">${mediaAno}%</div><div class="kpi-sub">${doAno.length} meses</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Faltas+Atestados ${anoAtual}</div><div class="kpi-val">${totalFaltas}h</div><div class="kpi-sub">horas perdidas no ano</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Horas Contratadas ${anoAtual}</div><div class="kpi-val" style="font-size:20px">${totalHoras.toLocaleString('pt-BR')}h</div><div class="kpi-sub">total do ano</div></div>`;
+}
+
+function renderAbsChart() {
+  const dados = allAbs.slice(-24); // últimos 24 meses
+  const labels = dados.map(r => {
+    const [y,m] = (r.periodo||'').split('-');
+    return (MESES_NOME[parseInt(m)]||m)?.slice(0,3) + '/' + (y||'').slice(2);
+  });
+  const percs = dados.map(r => r.percentual||0);
+  if (chartAbs) chartAbs.destroy();
+  chartAbs = new Chart(document.getElementById('chartAbs'), {
+    type: 'line',
+    data: { labels, datasets: [{
+      label: '% Absenteísmo', data: percs,
+      borderColor: '#0b4e7d', backgroundColor: 'rgba(11,78,125,0.08)',
+      tension: 0.3, fill: true, pointRadius: 4, pointBackgroundColor: '#0b4e7d'
+    }]},
+    options: {
+      plugins: { legend:{ display:false } },
+      scales: {
+        y: { ticks:{ callback: v => v+'%', font:{size:10} }, grid:{ color:'#f0f4f8' } },
+        x: { ticks:{ font:{size:10} }, grid:{ display:false } }
+      }
+    }
+  });
+}
+
+function renderAbsTable() {
+  const ano = document.getElementById('absAnoFilter')?.value || String(new Date().getFullYear());
+  const lista = allAbs.filter(r => (r.periodo||'').startsWith(ano));
+  const wrap = document.getElementById('absTableWrap');
+  if (!lista.length) {
+    wrap.innerHTML = `<div class="empty-state">Nenhum registro para ${ano}.<br><small>Clique em "+ Adicionar Mês" ou importe o Excel.</small></div>`;
+    return;
+  }
+  wrap.innerHTML = `<table class="table">
+    <thead><tr><th>Mês/Ano</th><th>Faltas e Atestados (h)</th><th>Atrasos (h)</th><th>Horas Contratadas</th><th>% Absenteísmo</th><th></th></tr></thead>
+    <tbody>${lista.map(r => {
+      const [y,m] = (r.periodo||'').split('-');
+      const lbl = (MESES_NOME[parseInt(m)]||m) + '/' + y;
+      const perc = (r.percentual||0).toFixed(2);
+      const cor  = r.percentual > 5 ? 'badge-red' : r.percentual > 3 ? 'badge-orange' : 'badge-green';
+      return `<tr>
+        <td><strong style="color:#1a2535">${lbl}</strong></td>
+        <td>${(r.faltas||0).toFixed(1)}h</td>
+        <td>${(r.atrasos||0).toFixed(2)}h</td>
+        <td>${(r.horas_contratadas||0).toLocaleString('pt-BR')}h</td>
+        <td><span class="badge ${cor}">${perc}%</span></td>
+        <td><div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-outline" onclick='editAbs("${r.id}")'>Editar</button>
+          <button class="btn btn-sm btn-danger"  onclick='deleteAbs("${r.id}")'>Excluir</button>
+        </div></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+function openAbsModal() {
+  document.getElementById('absId').value = '';
+  const hoje = new Date();
+  document.getElementById('absMes').value = String(hoje.getMonth()+1).padStart(2,'0');
+  document.getElementById('absAno').value = String(hoje.getFullYear());
+  ['absFaltas','absAtrasos','absHoras','absPerc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('absModalTitle').textContent = 'Adicionar Mês';
+  document.getElementById('absModal').classList.add('open');
+}
+
+function editAbs(id) {
+  const r = allAbs.find(x => x.id === id); if (!r) return;
+  const [y,m] = (r.periodo||'').split('-');
+  document.getElementById('absId').value      = r.id;
+  document.getElementById('absMes').value     = m||'01';
+  document.getElementById('absAno').value     = y||'2026';
+  document.getElementById('absFaltas').value  = r.faltas||'';
+  document.getElementById('absAtrasos').value = r.atrasos||'';
+  document.getElementById('absHoras').value   = r.horas_contratadas||'';
+  document.getElementById('absPerc').value    = r.percentual||'';
+  document.getElementById('absModalTitle').textContent = 'Editar Mês';
+  document.getElementById('absModal').classList.add('open');
+}
+
+function closeAbsModal() { document.getElementById('absModal').classList.remove('open'); }
+
+async function saveAbs() {
+  const id  = document.getElementById('absId').value;
+  const mes = document.getElementById('absMes').value;
+  const ano = document.getElementById('absAno').value;
+  if (!mes || !ano) { toast('Informe mês e ano', 'e'); return; }
+  const periodo = `${ano}-${mes}`;
+  const faltas  = parseFloat(document.getElementById('absFaltas').value)||0;
+  const atrasos = parseFloat(document.getElementById('absAtrasos').value)||0;
+  const horas   = parseFloat(document.getElementById('absHoras').value)||0;
+  let   perc    = parseFloat(document.getElementById('absPerc').value)||0;
+  if (!perc && horas > 0) perc = parseFloat(((faltas + atrasos) / horas * 100).toFixed(2));
+  const payload = { periodo, faltas, atrasos, horas_contratadas: horas, percentual: perc };
+  try {
+    if (id) await db.collection('absenteismo').doc(id).update(payload);
+    else    await db.collection('absenteismo').add(payload);
+    toast(id ? 'Registro atualizado!' : 'Registro salvo!');
+    closeAbsModal();
+    await loadAbs();
+  } catch(e) { toast('Erro: ' + e.message, 'e'); }
+}
+
+async function deleteAbs(id) {
+  if (!confirm('Excluir este registro?')) return;
+  try {
+    await db.collection('absenteismo').doc(id).delete();
+    toast('Registro excluído.');
+    await loadAbs();
+  } catch(e) { toast('Erro ao excluir', 'e'); }
+}
+
+function importAbsExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const wb  = XLSX.read(e.target.result, { type:'array' });
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+    if (!raw.length) { toast('Planilha vazia', 'e'); return; }
+
+    function norm(s) {
+      return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    }
+
+    // Encontra as linhas de dados pelo label na coluna A
+    let rowFaltas=-1, rowAtrasos=-1, rowHoras=-1, rowPerc=-1, rowMes=-1;
+    for (let i = 0; i < raw.length; i++) {
+      const lbl = norm(raw[i][0]||'');
+      if (lbl.includes('falta') || lbl.includes('atestado'))   rowFaltas  = i;
+      if (lbl.includes('atraso'))                               rowAtrasos = i;
+      if (lbl.includes('hora') && lbl.includes('contrat'))      rowHoras   = i;
+      if (lbl.startsWith('%') || lbl.includes('% ab') || (lbl.includes('%') && lbl.length < 8)) rowPerc = i;
+      // Linha de cabeçalho com nomes dos meses (detecta pelo conteúdo das colunas)
+      if (rowMes === -1) {
+        const cols = raw[i].slice(1).map(norm);
+        if (cols.some(c => Object.keys(MESES_MAP).some(m => c.includes(m)))) rowMes = i;
+      }
+    }
+
+    if (rowMes === -1) { toast('Linha de meses não encontrada', 'e'); return; }
+
+    const headerCols = raw[rowMes].slice(1); // colunas a partir da B
+    // Tenta pegar o ano de uma linha acima se disponível
+    const yearRow = rowMes > 0 ? raw[rowMes - 1] : [];
+
+    const periodos = headerCols.map((h, idx) => {
+      const hn = norm(String(h));
+      // Tenta extrair mês e ano do próprio cabeçalho (ex: "janeiro2023")
+      const matchInline = hn.match(/([a-z]+)(\d{4})/);
+      if (matchInline) {
+        const mesNum = MESES_MAP[matchInline[1]];
+        return mesNum ? `${matchInline[2]}-${mesNum}` : null;
+      }
+      // Tenta pegar só o mês + ano da linha de anos acima
+      const mesNum = Object.entries(MESES_MAP).find(([k]) => hn.includes(k))?.[1];
+      const anoVal = String(yearRow[idx+1]||'').match(/\d{4}/)?.[0];
+      return (mesNum && anoVal) ? `${anoVal}-${mesNum}` : null;
+    });
+
+    const validas = periodos.filter(Boolean);
+    if (!validas.length) { toast('Não foi possível identificar os meses', 'e'); return; }
+
+    if (allAbs.length > 0) {
+      const sub = confirm(`Já existem ${allAbs.length} registros de absenteísmo.\n\nOK = SUBSTITUIR tudo\nCancelar = ADICIONAR`);
+      if (sub) {
+        const batch = db.batch();
+        allAbs.forEach(r => batch.delete(db.collection('absenteismo').doc(r.id)));
+        await batch.commit();
+      }
+    }
+
+    let importados = 0, erros = 0;
+    for (let col = 0; col < periodos.length; col++) {
+      const periodo = periodos[col];
+      if (!periodo) continue;
+      const faltas  = parseFloat(rowFaltas  >= 0 ? raw[rowFaltas][col+1]  : 0)||0;
+      const atrasos = parseFloat(rowAtrasos >= 0 ? raw[rowAtrasos][col+1] : 0)||0;
+      const horas   = parseFloat(rowHoras   >= 0 ? raw[rowHoras][col+1]   : 0)||0;
+      let   perc    = parseFloat(rowPerc    >= 0 ? String(raw[rowPerc][col+1]).replace('%','') : 0)||0;
+      if (!perc && horas > 0) perc = parseFloat(((faltas+atrasos)/horas*100).toFixed(2));
+      try {
+        await db.collection('absenteismo').add({ periodo, faltas, atrasos, horas_contratadas: horas, percentual: perc });
+        importados++;
+      } catch(err) { erros++; }
+    }
+    toast(`${importados} mês(es) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
+    input.value = '';
+    await loadAbs();
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ══ DASHBOARD ══════════════════════════════════════════════
