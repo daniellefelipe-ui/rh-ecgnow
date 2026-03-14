@@ -147,7 +147,7 @@
         <button class="nav-item" onclick="showSection('recrutamento',this)">🎯 &nbsp;Recrutamento</button>
         <button class="nav-item" onclick="showSection('treinamentos',this)">📚 &nbsp;Treinamentos</button>
         <button class="nav-item" onclick="showSection('enps',this)">💬 &nbsp;e-NPS</button>
-        <button class="nav-item" disabled>⭐ &nbsp;e-SAT</button>
+        <button class="nav-item" onclick="showSection('esat',this)">⭐ &nbsp;e-SAT</button>
       </nav>
     </div>
     <div class="sb-footer">
@@ -352,6 +352,35 @@
         <div id="enpsTableWrap"><div class="empty-state">Carregando...</div></div>
       </div>
     </section>
+
+    <section class="page-section" id="sec-esat">
+      <div class="page-header"><h1>e-SAT</h1></div>
+      <div class="kpi-grid" id="esatKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">Evolução da Média e-SAT</span></div>
+        <canvas id="chartEsat" height="110"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Resultado por Período</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="document.getElementById('esatExcelInput').click()">📥 Importar Excel</button>
+            <input type="file" id="esatExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importEsatExcel(this)">
+            <button class="btn btn-primary" onclick="openEsatModal()">+ Adicionar Período</button>
+          </div>
+        </div>
+        <div id="esatTableWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+      <div class="card" id="esatDetalheCard" style="display:none;margin-top:16px">
+        <div class="card-header">
+          <span class="card-title" id="esatDetalheTitle">Notas Individuais</span>
+          <button class="btn btn-sm btn-outline" onclick="document.getElementById('esatDetalheCard').style.display='none'">Fechar</button>
+        </div>
+        <div id="esatDetalheWrap"></div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -478,6 +507,47 @@
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeAbsModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveAbs()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL e-SAT -->
+<div class="modal-overlay" id="esatModal">
+  <div class="modal" style="width:560px">
+    <div class="modal-header">
+      <span class="modal-title" id="esatModalTitle">Adicionar Período e-SAT</span>
+      <button class="modal-close" onclick="closeEsatModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <input type="hidden" id="esatId">
+      <div class="form-group">
+        <label class="form-label">Período (rótulo) *</label>
+        <input type="text" class="form-input" id="esatPeriodo" placeholder="Ex: Junho/2024, 1ºSem/2025">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ordem (para ordenação)</label>
+        <input type="number" class="form-input" id="esatOrdem" placeholder="Ex: 1, 2, 3...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Meta</label>
+        <input type="number" class="form-input" id="esatMeta" value="4.50" step="0.01">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Notas individuais (separadas por vírgula ou nova linha)</label>
+        <textarea class="form-input" id="esatNotas" rows="5" placeholder="Ex: 4.73, 4.32, 4.50, 3.92, 4.35..." oninput="calcEsat()" style="resize:vertical"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Média <span style="font-weight:400;color:#888">(calculado)</span></label>
+        <input type="number" class="form-input" id="esatMedia" step="0.01" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+      <div class="form-group">
+        <label class="form-label">% Acima da Meta <span style="font-weight:400;color:#888">(calculado)</span></label>
+        <input type="number" class="form-input" id="esatPctMeta" step="0.01" readonly style="background:#f5f5f5;cursor:default">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeEsatModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveEsat()">Salvar</button>
     </div>
   </div>
 </div>
@@ -1000,8 +1070,8 @@ function calcTempoCasa(admissao, demissao, status) {
   return anos + ' ano' + (anos !== 1 ? 's' : '') + (m > 0 ? ' e ' + m + ' mes' + (m !== 1 ? 'es' : '') : '');
 }
 
-let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [], allTrein = [], allEnps = [];
-let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null, chartEnps = null;
+let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [], allTrein = [], allEnps = [], allEsat = [];
+let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null, chartEnps = null, chartEsat = null;
 
 async function loadAll() {
   await loadColabs();
@@ -1011,6 +1081,7 @@ async function loadAll() {
   await loadRec();
   await loadTrein();
   await loadEnps();
+  await loadEsat();
 }
 
 // ══ COLABORADORES ══════════════════════════════════════════
@@ -2473,6 +2544,242 @@ function importEnpsExcel(input) {
     }
     toast(`${importados} pesquisa(s) importada(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
     input.value=''; await loadEnps();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══ e-SAT ════════════════════════════════════════════════════
+async function loadEsat() {
+  try {
+    const snap = await db.collection('esat').orderBy('ordem').get();
+    allEsat = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderEsatKpis(); renderEsatChart(); renderEsatTable();
+  } catch(e) {
+    try {
+      const snap2 = await db.collection('esat').get();
+      allEsat = snap2.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b)=>(a.ordem||0)-(b.ordem||0));
+      renderEsatKpis(); renderEsatChart(); renderEsatTable();
+    } catch(e2) { console.error('loadEsat', e2); }
+  }
+}
+
+function renderEsatKpis() {
+  const ultimo   = allEsat[allEsat.length - 1] || {};
+  const meta     = ultimo.meta || 4.5;
+  const mediaUlt = (ultimo.media||0).toFixed(2);
+  const mediaGeral = allEsat.length ? (allEsat.reduce((s,r)=>s+(r.media||0),0)/allEsat.length).toFixed(2) : '—';
+  const pctMeta  = (ultimo.pct_acima_meta||0).toFixed(1);
+  const totalResp= allEsat.reduce((s,r)=>s+(r.total_respostas||0),0);
+  const cor = v => parseFloat(v) >= meta ? 'color:#00a878' : parseFloat(v) >= meta*0.9 ? 'color:#d97706' : 'color:#e53e3e';
+  document.getElementById('esatKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">Média · ${ultimo.periodo||'—'}</div><div class="kpi-val" style="${cor(mediaUlt)}">${mediaUlt}</div><div class="kpi-sub">meta ${meta.toFixed(2)}</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Média Geral</div><div class="kpi-val" style="${cor(mediaGeral)}">${mediaGeral}</div><div class="kpi-sub">${allEsat.length} períodos avaliados</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Acima da Meta · ${ultimo.periodo||'—'}</div><div class="kpi-val" style="color:#00a878">${pctMeta}%</div><div class="kpi-sub">dos colaboradores</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Total Avaliações</div><div class="kpi-val">${totalResp}</div><div class="kpi-sub">respostas coletadas</div></div>`;
+}
+
+function renderEsatChart() {
+  const labels = allEsat.map(r => r.periodo||'—');
+  const medias = allEsat.map(r => r.media||0);
+  const meta   = allEsat.length ? (allEsat[0].meta||4.5) : 4.5;
+  if (chartEsat) chartEsat.destroy();
+  chartEsat = new Chart(document.getElementById('chartEsat'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Média e-SAT', data: medias, backgroundColor: medias.map(v=>v>=meta?'#00a878':v>=meta*0.9?'#d97706':'#e53e3e'), borderRadius:6 },
+      { label:'Meta', data: allEsat.map(()=>meta), type:'line', borderColor:'#0b4e7d', borderDash:[6,3], borderWidth:2, pointRadius:0, fill:false }
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:10, padding:12 } } },
+      scales:{ y:{ min:0, max:5, ticks:{ stepSize:0.5 } } } }
+  });
+}
+
+function renderEsatTable() {
+  const wrap = document.getElementById('esatTableWrap');
+  if (!allEsat.length) { wrap.innerHTML=`<div class="empty-state">Nenhum período registrado.<br>Clique em "+ Adicionar Período" ou importe o Excel.</div>`; return; }
+  const lista = [...allEsat].reverse();
+  wrap.innerHTML = `<table class="table"><thead><tr>
+    <th>Período</th><th>Respostas</th><th>Média</th><th>Meta</th><th>Acima da Meta</th><th>Abaixo da Meta</th><th></th>
+  </tr></thead><tbody>${lista.map(r=>{
+    const meta = r.meta||4.5;
+    const cor  = r.media>=meta?'badge-green':r.media>=meta*0.9?'badge-orange':'badge-red';
+    return `<tr>
+      <td><strong>${r.periodo||'—'}</strong></td>
+      <td>${r.total_respostas||0}</td>
+      <td><span class="badge ${cor}">${(r.media||0).toFixed(2)}</span></td>
+      <td>${meta.toFixed(2)}</td>
+      <td style="color:#00a878">${r.acima_meta||0} (${(r.pct_acima_meta||0).toFixed(1)}%)</td>
+      <td style="color:#e53e3e">${r.abaixo_meta||0} (${(r.pct_abaixo_meta||0).toFixed(1)}%)</td>
+      <td><div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-outline" onclick='verNotasEsat("${r.id}")'>Ver Notas</button>
+        <button class="btn btn-sm btn-outline" onclick='editEsat("${r.id}")'>Editar</button>
+        <button class="btn btn-sm btn-danger"  onclick='deleteEsat("${r.id}")'>Excluir</button>
+      </div></td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function verNotasEsat(id) {
+  const r = allEsat.find(x=>x.id===id); if (!r) return;
+  const card = document.getElementById('esatDetalheCard');
+  document.getElementById('esatDetalheTitle').textContent = `Notas Individuais — ${r.periodo}`;
+  const notas = (r.notas||[]).sort((a,b)=>b.nota-a.nota);
+  const meta  = r.meta||4.5;
+  document.getElementById('esatDetalheWrap').innerHTML = `<table class="table"><thead><tr>
+    <th>Colaborador</th><th>Setor</th><th>Nota</th><th>Status</th>
+  </tr></thead><tbody>${notas.map(n=>{
+    const cor = n.nota>=meta?'badge-green':n.nota>=meta*0.9?'badge-orange':'badge-red';
+    return `<tr><td>${n.nome||'—'}</td><td>${n.setor||'—'}</td><td><span class="badge ${cor}">${(n.nota||0).toFixed(2)}</span></td><td>${n.nota>=meta?'✓ Acima':'↓ Abaixo'}</td></tr>`;
+  }).join('')}</tbody></table>`;
+  card.style.display = '';
+  card.scrollIntoView({ behavior:'smooth' });
+}
+
+function calcEsat() {
+  const raw   = document.getElementById('esatNotas').value;
+  const meta  = parseFloat(document.getElementById('esatMeta').value)||4.5;
+  const notas = raw.split(/[\s,;\n]+/).map(v=>parseFloat(v.replace(',','.'))).filter(n=>!isNaN(n)&&n>=0&&n<=5);
+  if (!notas.length) { ['esatMedia','esatPctMeta'].forEach(id=>document.getElementById(id).value=''); return; }
+  const media = notas.reduce((s,n)=>s+n,0)/notas.length;
+  const acima = notas.filter(n=>n>=meta).length;
+  document.getElementById('esatMedia').value   = media.toFixed(2);
+  document.getElementById('esatPctMeta').value = (acima/notas.length*100).toFixed(1);
+}
+
+function openEsatModal() {
+  document.getElementById('esatId').value = '';
+  document.getElementById('esatPeriodo').value = '';
+  document.getElementById('esatOrdem').value   = allEsat.length + 1;
+  document.getElementById('esatMeta').value    = '4.50';
+  document.getElementById('esatNotas').value   = '';
+  ['esatMedia','esatPctMeta'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('esatModalTitle').textContent = 'Adicionar Período e-SAT';
+  document.getElementById('esatModal').classList.add('open');
+}
+
+function editEsat(id) {
+  const r = allEsat.find(x=>x.id===id); if (!r) return;
+  document.getElementById('esatId').value      = r.id;
+  document.getElementById('esatPeriodo').value = r.periodo||'';
+  document.getElementById('esatOrdem').value   = r.ordem||'';
+  document.getElementById('esatMeta').value    = r.meta||4.5;
+  document.getElementById('esatNotas').value   = (r.notas||[]).map(n=>n.nota).join(', ');
+  document.getElementById('esatMedia').value   = (r.media||0).toFixed(2);
+  document.getElementById('esatPctMeta').value = (r.pct_acima_meta||0).toFixed(1);
+  document.getElementById('esatModalTitle').textContent = 'Editar Período';
+  document.getElementById('esatModal').classList.add('open');
+}
+
+function closeEsatModal() { document.getElementById('esatModal').classList.remove('open'); }
+
+async function saveEsat() {
+  const id      = document.getElementById('esatId').value;
+  const periodo = document.getElementById('esatPeriodo').value.trim();
+  if (!periodo) { toast('Informe o período','e'); return; }
+  const meta  = parseFloat(document.getElementById('esatMeta').value)||4.5;
+  const raw   = document.getElementById('esatNotas').value;
+  const vals  = raw.split(/[\s,;\n]+/).map(v=>parseFloat(v.replace(',','.'))).filter(n=>!isNaN(n)&&n>=0&&n<=5);
+  if (!vals.length) { toast('Informe ao menos uma nota','e'); return; }
+  const media       = vals.reduce((s,n)=>s+n,0)/vals.length;
+  const acima_meta  = vals.filter(n=>n>=meta).length;
+  const abaixo_meta = vals.length - acima_meta;
+  const notas       = vals.map(n=>({ nota:n, nome:'', setor:'' }));
+  const payload = {
+    periodo, meta, ordem: parseInt(document.getElementById('esatOrdem').value)||0,
+    media: parseFloat(media.toFixed(2)),
+    total_respostas: vals.length, acima_meta, abaixo_meta,
+    pct_acima_meta:  parseFloat((acima_meta/vals.length*100).toFixed(1)),
+    pct_abaixo_meta: parseFloat((abaixo_meta/vals.length*100).toFixed(1)),
+    notas,
+  };
+  try {
+    if (id) await db.collection('esat').doc(id).update(payload);
+    else    await db.collection('esat').add(payload);
+    toast(id ? 'Período atualizado!' : 'Período salvo!');
+    closeEsatModal();
+    await loadEsat();
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+async function deleteEsat(id) {
+  if (!confirm('Excluir este período?')) return;
+  try {
+    await db.collection('esat').doc(id).delete();
+    toast('Período excluído.');
+    await loadEsat();
+  } catch(e) { toast('Erro ao excluir','e'); }
+}
+
+function importEsatExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const wb = XLSX.read(e.target.result, {type:'array'});
+    const _nn = n => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const abaNome = wb.SheetNames.find(n=>_nn(n).includes('esat')||_nn(n).includes('sat')) || wb.SheetNames[0];
+    const ws = wb.Sheets[abaNome];
+    const ref = ws['!ref']||'A1', rng = XLSX.utils.decode_range(ref);
+    const merges = ws['!merges']||[];
+    const G = [];
+    for (let r=rng.s.r;r<=rng.e.r;r++) { G[r]=[]; for (let c=rng.s.c;c<=rng.e.c;c++) { const a=XLSX.utils.encode_cell({r,c}); G[r][c]=ws[a]?ws[a].v:''; } }
+    for (const m of merges) { const v=G[m.s.r]?.[m.s.c]??''; for(let r=m.s.r;r<=m.e.r;r++) for(let c=m.s.c;c<=m.e.c;c++) if(G[r]) G[r][c]=v; }
+    function norm(s){ return String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+    const rowGrupo = rng.s.r;
+    const rowMes   = rng.s.r + 1;
+    const dataStart= rng.s.r + 2;
+    let colNome=-1, colSetor=-1, colMeta=-1;
+    for (let c=rng.s.c;c<=rng.e.c;c++) {
+      const h=norm(G[rowGrupo][c]||G[rowMes][c]||'');
+      if (colNome ===-1 && (h.includes('colabor')||h.includes('nome'))) colNome=c;
+      else if (colSetor===-1 && h.includes('setor')) colSetor=c;
+      else if (colMeta ===-1 && h.includes('meta'))  colMeta=c;
+    }
+    if (colNome===-1) colNome=rng.s.c;
+    if (colMeta===-1) colMeta=rng.s.c+3;
+    const periodos = [];
+    for (let c=colMeta+1;c<=rng.e.c;c++) {
+      const grupo = String(G[rowGrupo][c]||'').trim();
+      const mes   = String(G[rowMes][c]||'').trim();
+      if (!mes && !grupo) continue;
+      const label = grupo && mes ? `${mes}/${grupo}` : grupo||mes;
+      periodos.push({ c, label });
+    }
+    if (!periodos.length) { toast('Nenhum período encontrado','e'); return; }
+    const metaDefault = 4.5;
+    const registros = periodos.map(({c, label}, idx) => {
+      const notas = [];
+      for (let r=dataStart;r<=rng.e.r;r++) {
+        const v = G[r][c];
+        if (v===''||v===null||v===undefined||v==='-') continue;
+        const n = parseFloat(String(v).replace(',','.'));
+        if (isNaN(n)||n<0||n>5) continue;
+        const nome  = String(G[r][colNome]||'').trim();
+        const setor = colSetor>=0 ? String(G[r][colSetor]||'').trim() : '';
+        notas.push({ nota: parseFloat(n.toFixed(2)), nome, setor });
+      }
+      if (!notas.length) return null;
+      const vals = notas.map(n=>n.nota);
+      const metaVal = colMeta>=0 ? (parseFloat(String(G[dataStart][colMeta]).replace(',','.'))||metaDefault) : metaDefault;
+      const media = vals.reduce((s,v)=>s+v,0)/vals.length;
+      const acima = notas.filter(n=>n.nota>=metaVal).length;
+      return { periodo:label, ordem:idx+1, meta:metaVal,
+               media:parseFloat(media.toFixed(2)), total_respostas:vals.length,
+               acima_meta:acima, abaixo_meta:vals.length-acima,
+               pct_acima_meta:parseFloat((acima/vals.length*100).toFixed(1)),
+               pct_abaixo_meta:parseFloat(((vals.length-acima)/vals.length*100).toFixed(1)),
+               notas };
+    }).filter(Boolean);
+    if (!registros.length) { toast('Nenhuma nota válida encontrada','e'); return; }
+    if (allEsat.length > 0) {
+      const sub = confirm(`Já existem ${allEsat.length} períodos.\n\nOK = SUBSTITUIR\nCancelar = ADICIONAR`);
+      if (sub) { const batch=db.batch(); allEsat.forEach(r=>batch.delete(db.collection('esat').doc(r.id))); await batch.commit(); }
+    }
+    let importados=0, erros=0;
+    for (const p of registros) {
+      try { await db.collection('esat').add(p); importados++; } catch(err){ erros++; }
+    }
+    toast(`${importados} período(s) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
+    input.value=''; await loadEsat();
   };
   reader.readAsArrayBuffer(file);
 }
