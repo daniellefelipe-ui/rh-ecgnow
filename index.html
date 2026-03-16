@@ -453,6 +453,7 @@
             <select class="form-select" id="finAnoFilter" onchange="renderFinTable()" style="width:100px">
               <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
             </select>
+            <button class="btn btn-danger btn-sm" onclick="limparFinDados()" style="font-size:11px">🗑 Limpar dados</button>
             <button class="btn btn-outline" id="finImportBtn" onclick="document.getElementById('finExcelInput').click()">📥 Importar Excel</button>
             <input type="file" id="finExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importFinExcel(this)">
             <input type="file" id="finExcelVt"  accept=".xlsx,.xls" style="display:none" onchange="importFinExcelTipo(this,'vt')">
@@ -3061,6 +3062,21 @@ function importFinExcelTipo(input, tipo) {
   importFinExcel(input);
 }
 
+async function limparFinDados() {
+  const tipo = FIN_TIPOS[finTabAtual];
+  if (!confirm(`Excluir TODOS os registros de "${tipo}"?\n\nEsta ação não pode ser desfeita.`)) return;
+  try {
+    const snap = await db.collection('financeiro').where('tipo','==',finTabAtual).get();
+    if (!snap.empty) {
+      const batch = db.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    toast(`Dados de ${tipo} removidos.`);
+    await loadFin();
+  } catch(e) { toast('Erro ao limpar: '+e.message,'e'); }
+}
+
 function renderFinKpis() {
   const ano  = parseInt(document.getElementById('finAnoFilter')?.value || 2026);
   const data = allFin.filter(r => r.tipo === finTabAtual && r.ano === ano);
@@ -3219,20 +3235,22 @@ function importFinExcel(input) {
           const col = anoMesCols[`${ano}-${mi}`];
           if (col === undefined) continue;
           const v = G[r][col];
-          const num = parseFloat(String(v||0).replace('R$','').replace(/\./g,'').replace(',','.').trim())||0;
-          if (num > 0) registros[key].meses[mi] = num;
+          let num = 0;
+          if (typeof v === 'number') { num = v; }
+          else { num = parseFloat(String(v||'').replace('R$','').replace(/\s/g,'').replace(/\./g,'').replace(',','.').trim())||0; }
+          if (num > 0) registros[key].meses[mi] = parseFloat(num.toFixed(2));
         }
       }
     }
     const lista = Object.values(registros).filter(x => Object.keys(x.meses).length > 0);
     if (!lista.length) { toast('Nenhum dado encontrado','e'); return; }
-    // Confirma substituição
-    const anosStr = anosDisp.join(', ');
+    // Sempre substitui registros existentes do mesmo tipo+anos
     const snap = await db.collection('financeiro').where('tipo','==',tipo).get();
     const existentes = snap.docs.filter(d => anosDisp.includes(d.data().ano));
     if (existentes.length > 0) {
-      const sub = confirm(`Já existem ${existentes.length} registros de ${FIN_TIPOS[tipo]} para os anos ${anosStr}.\n\nOK = SUBSTITUIR\nCancelar = ADICIONAR`);
-      if (sub) { const batch=db.batch(); existentes.forEach(d=>batch.delete(d.ref)); await batch.commit(); }
+      const confirma = confirm(`Substituir ${existentes.length} registro(s) existente(s) de ${FIN_TIPOS[tipo]}?`);
+      if (!confirma) { input.value=''; return; }
+      const batch=db.batch(); existentes.forEach(d=>batch.delete(d.ref)); await batch.commit();
     }
     let ok=0, err=0;
     for (const reg of lista) {
