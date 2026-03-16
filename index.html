@@ -420,6 +420,27 @@
       <div class="kpi-grid" id="finKpis">
         <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
       </div>
+
+      <!-- Visão consolidada por mês -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <span class="card-title">Consolidado por Colaborador</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <select class="form-select" id="finMesConsolid" onchange="renderFinConsolidado()" style="width:130px">
+              <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option>
+              <option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option>
+              <option value="6">Julho</option><option value="7">Agosto</option><option value value="8">Setembro</option>
+              <option value="9">Outubro</option><option value="10">Novembro</option><option value="11">Dezembro</option>
+            </select>
+            <select class="form-select" id="finAnoConsolid" onchange="renderFinConsolidado()" style="width:100px">
+              <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+            </select>
+          </div>
+        </div>
+        <div id="finConsolidWrap"><div class="empty-state">Importe os dados para visualizar o consolidado.</div></div>
+      </div>
+
+      <!-- Visão por tipo -->
       <div class="card">
         <div class="card-header">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -432,8 +453,12 @@
             <select class="form-select" id="finAnoFilter" onchange="renderFinTable()" style="width:100px">
               <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
             </select>
-            <button class="btn btn-outline" onclick="document.getElementById('finExcelInput').click()">📥 Importar Excel</button>
+            <button class="btn btn-outline" id="finImportBtn" onclick="document.getElementById('finExcelInput').click()">📥 Importar Excel</button>
             <input type="file" id="finExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importFinExcel(this)">
+            <input type="file" id="finExcelVt"  accept=".xlsx,.xls" style="display:none" onchange="importFinExcelTipo(this,'vt')">
+            <input type="file" id="finExcelVa"  accept=".xlsx,.xls" style="display:none" onchange="importFinExcelTipo(this,'va')">
+            <input type="file" id="finExcelVho" accept=".xlsx,.xls" style="display:none" onchange="importFinExcelTipo(this,'vho')">
+            <input type="file" id="finExcelAc"  accept=".xlsx,.xls" style="display:none" onchange="importFinExcelTipo(this,'ac')">
             <button class="btn btn-primary" onclick="openFinModal()">+ Adicionar</button>
           </div>
         </div>
@@ -2965,7 +2990,10 @@ async function loadFin() {
   try {
     const snap = await db.collection('financeiro').get();
     allFin = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderFinKpis(); renderFinTable();
+    renderFinKpis(); renderFinTable(); renderFinConsolidado();
+    // Inicializa mês do consolidado com o mês atual
+    const selMes = document.getElementById('finMesConsolid');
+    if (selMes && selMes.value === '0') selMes.value = new Date().getMonth();
   } catch(e) { console.error('loadFin', e); }
 }
 
@@ -2975,7 +3003,62 @@ function setFinTab(tipo) {
     const btn = document.getElementById('finTab-' + t);
     if (btn) btn.className = t === tipo ? 'btn btn-primary' : 'btn btn-outline';
   });
+  // Atualiza botão de import para o tipo ativo
+  const importBtn = document.getElementById('finImportBtn');
+  const tipoNomes = { vt:'Vale Transporte', va:'Vale Alimentação', vho:'Vale Home Office', ac:'Ajuda de Custo' };
+  if (importBtn) {
+    importBtn.textContent = `📥 Importar ${tipoNomes[tipo]}`;
+    importBtn.onclick = () => document.getElementById('finExcel' + tipo.charAt(0).toUpperCase() + tipo.slice(1)).click();
+  }
   renderFinKpis(); renderFinTable();
+}
+
+function renderFinConsolidado() {
+  const wrap = document.getElementById('finConsolidWrap');
+  const mes  = parseInt(document.getElementById('finMesConsolid')?.value ?? new Date().getMonth());
+  const ano  = parseInt(document.getElementById('finAnoConsolid')?.value || 2026);
+  const mesKey = FIN_MESES[mes];
+  // Todos os colaboradores que têm qualquer dado no mês/ano
+  const nomes = [...new Set(allFin.filter(r => r.ano === ano).map(r => r.colaborador_nome))].sort();
+  if (!nomes.length) { wrap.innerHTML = `<div class="empty-state">Nenhum dado para ${FIN_MESES_NOME[mes]}/${ano}.</div>`; return; }
+  const tipos = ['vt','va','vho','ac'];
+  const totalGeral = { vt:0, va:0, vho:0, ac:0 };
+  const rows = nomes.map(nome => {
+    const vals = {};
+    let totalColab = 0;
+    tipos.forEach(t => {
+      const reg = allFin.find(r => r.tipo===t && r.ano===ano && r.colaborador_nome===nome);
+      vals[t] = reg ? (reg[mesKey]||0) : 0;
+      totalColab += vals[t];
+      totalGeral[t] += vals[t];
+    });
+    return { nome, vals, totalColab };
+  }).filter(r => r.totalColab > 0 || true); // mostra todos mesmo sem valor
+  const totalMes = Object.values(totalGeral).reduce((s,v)=>s+v,0);
+  wrap.innerHTML = `<div style="overflow-x:auto"><table class="table">
+    <thead><tr>
+      <th>Colaborador</th>
+      <th>Vale Transporte</th><th>Vale Alimentação/Ref.</th><th>Vale Home Office</th><th>Ajuda de Custo</th>
+      <th>Total do Mês</th>
+    </tr></thead>
+    <tbody>
+      ${rows.map(r => `<tr>
+        <td><strong style="color:#1a2535">${r.nome}</strong></td>
+        ${tipos.map(t=>`<td class="currency">${r.vals[t]>0?fmt(r.vals[t]):'<span style="color:#cbd5e1">—</span>'}</td>`).join('')}
+        <td><strong class="currency" style="color:#0b4e7d">${r.totalColab>0?fmt(r.totalColab):'—'}</strong></td>
+      </tr>`).join('')}
+      <tr style="background:#f8fafc;font-weight:700;border-top:2px solid #e2e8f0">
+        <td style="color:#0b4e7d">TOTAL</td>
+        ${tipos.map(t=>`<td class="currency" style="color:#0b4e7d">${totalGeral[t]>0?fmt(totalGeral[t]):'—'}</td>`).join('')}
+        <td class="currency" style="color:#0b4e7d">${fmt(totalMes)}</td>
+      </tr>
+    </tbody>
+  </table></div>`;
+}
+
+function importFinExcelTipo(input, tipo) {
+  finTabAtual = tipo;
+  importFinExcel(input);
 }
 
 function renderFinKpis() {
