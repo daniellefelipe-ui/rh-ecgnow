@@ -172,6 +172,7 @@
         <button class="nav-item active" onclick="showSection('dashboard',this)">🏠 &nbsp;Dashboard</button>
         <button class="nav-item"        onclick="showSection('colaboradores',this)">👤 &nbsp;Colaboradores</button>
         <button class="nav-item"        onclick="showSection('headcount',this)">💰 &nbsp;Headcount</button>
+        <button class="nav-item" onclick="showSection('financeiro',this)">💵 &nbsp;Financeiro</button>
         <button class="nav-item" onclick="showSection('absenteismo',this)">📋 &nbsp;Absenteísmo</button>
         <button class="nav-item" onclick="showSection('rotatividade',this)">🔄 &nbsp;Rotatividade</button>
         <button class="nav-item" onclick="showSection('recrutamento',this)">🎯 &nbsp;Recrutamento</button>
@@ -413,7 +414,70 @@
         <div id="esatDetalheWrap"></div>
       </div>
     </section>
+
+    <section class="page-section" id="sec-financeiro">
+      <div class="page-header"><h1>Financeiro</h1></div>
+      <div class="kpi-grid" id="finKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline" id="finTab-vt"  onclick="setFinTab('vt')" >Vale Transporte</button>
+            <button class="btn btn-outline" id="finTab-va"  onclick="setFinTab('va')" >Vale Alimentação/Refeição</button>
+            <button class="btn btn-outline" id="finTab-vho" onclick="setFinTab('vho')">Vale Home Office</button>
+            <button class="btn btn-outline" id="finTab-ac"  onclick="setFinTab('ac')" >Ajuda de Custo</button>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <select class="form-select" id="finAnoFilter" onchange="renderFinTable()" style="width:100px">
+              <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+            </select>
+            <button class="btn btn-outline" onclick="document.getElementById('finExcelInput').click()">📥 Importar Excel</button>
+            <input type="file" id="finExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importFinExcel(this)">
+            <button class="btn btn-primary" onclick="openFinModal()">+ Adicionar</button>
+          </div>
+        </div>
+        <div id="finTableWrap"><div class="empty-state">Selecione uma categoria acima.</div></div>
+      </div>
+    </section>
   </main>
+</div>
+
+<!-- MODAL FINANCEIRO -->
+<div class="modal-overlay" id="finModal">
+  <div class="modal" style="width:620px">
+    <div class="modal-header">
+      <span class="modal-title" id="finModalTitle">Adicionar Benefício</span>
+      <button class="modal-close" onclick="closeFinModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <input type="hidden" id="finId">
+      <div class="form-group">
+        <label class="form-label">Colaborador *</label>
+        <input type="text" class="form-input" id="finNome" placeholder="Nome completo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ano *</label>
+        <input type="number" class="form-input" id="finAno" value="2026">
+      </div>
+      <div class="form-group"><label class="form-label">Janeiro</label><input type="number" class="form-input" id="finJan" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Fevereiro</label><input type="number" class="form-input" id="finFev" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Março</label><input type="number" class="form-input" id="finMar" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Abril</label><input type="number" class="form-input" id="finAbr" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Maio</label><input type="number" class="form-input" id="finMai" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Junho</label><input type="number" class="form-input" id="finJun" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Julho</label><input type="number" class="form-input" id="finJul" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Agosto</label><input type="number" class="form-input" id="finAgo" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Setembro</label><input type="number" class="form-input" id="finSet" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Outubro</label><input type="number" class="form-input" id="finOut" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Novembro</label><input type="number" class="form-input" id="finNov" step="0.01" value="0"></div>
+      <div class="form-group"><label class="form-label">Dezembro</label><input type="number" class="form-input" id="finDez" step="0.01" value="0"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeFinModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveFin()">Salvar</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL COLABORADOR -->
@@ -1102,12 +1166,13 @@ function calcTempoCasa(admissao, demissao, status) {
   return anos + ' ano' + (anos !== 1 ? 's' : '') + (m > 0 ? ' e ' + m + ' mes' + (m !== 1 ? 'es' : '') : '');
 }
 
-let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [], allTrein = [], allEnps = [], allEsat = [];
+let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [], allTrein = [], allEnps = [], allEsat = [], allFin = [];
 let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null, chartEnps = null, chartEsat = null;
 
 async function loadAll() {
   await loadColabs();
   await loadHeadcount();
+  await loadFin();
   await loadAbs();
   await loadRot();
   await loadRec();
@@ -1243,6 +1308,8 @@ async function deleteColab(id, nome) {
     await loadColabs();
   } catch(e) { toast('Erro ao excluir', 'e'); }
 }
+
+function xnum(v){ if (typeof v === 'number') return v; return parseFloat(String(v).replace('R$','').replace(/\./g,'').replace(',','.').trim())||0; }
 
 // ══ HEADCOUNT ══════════════════════════════════════════════
 function populateHcColab() {
@@ -2884,6 +2951,223 @@ function importEsatExcel(input) {
     }
     toast(`${importados} período(s) importado(s)${erros?` · ${erros} erro(s)`:''}`, erros?'e':'s');
     input.value=''; await loadEsat();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══ FINANCEIRO ═══════════════════════════════════════════════
+let finTabAtual = 'vt';
+const FIN_TIPOS = { vt:'Vale Transporte', va:'Vale Alimentação/Refeição', vho:'Vale Home Office', ac:'Ajuda de Custo' };
+const FIN_MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const FIN_MESES_NOME = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+async function loadFin() {
+  try {
+    const snap = await db.collection('financeiro').get();
+    allFin = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderFinKpis(); renderFinTable();
+  } catch(e) { console.error('loadFin', e); }
+}
+
+function setFinTab(tipo) {
+  finTabAtual = tipo;
+  Object.keys(FIN_TIPOS).forEach(t => {
+    const btn = document.getElementById('finTab-' + t);
+    if (btn) btn.className = t === tipo ? 'btn btn-primary' : 'btn btn-outline';
+  });
+  renderFinKpis(); renderFinTable();
+}
+
+function renderFinKpis() {
+  const ano  = parseInt(document.getElementById('finAnoFilter')?.value || 2026);
+  const data = allFin.filter(r => r.tipo === finTabAtual && r.ano === ano);
+  const total = data.reduce((s,r) => s + (r.total||0), 0);
+  const benef = data.length;
+  // total por mês atual (março = 2, index 2)
+  const mesAtual = new Date().getMonth(); // 0-based
+  const totalMes = data.reduce((s,r) => s + (r[FIN_MESES[mesAtual]]||0), 0);
+  const mediaMes = benef ? totalMes / benef : 0;
+  document.getElementById('finKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">Total Anual · ${ano}</div><div class="kpi-val" style="font-size:18px;color:#0b4e7d">${fmt(total)}</div><div class="kpi-sub">${FIN_TIPOS[finTabAtual]}</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Mês Atual</div><div class="kpi-val" style="font-size:18px;color:#0b4e7d">${fmt(totalMes)}</div><div class="kpi-sub">${FIN_MESES_NOME[mesAtual]}</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Beneficiários</div><div class="kpi-val">${benef}</div><div class="kpi-sub">colaboradores</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Média por Colaborador</div><div class="kpi-val" style="font-size:18px">${fmt(mediaMes)}</div><div class="kpi-sub">no mês atual</div></div>`;
+}
+
+function renderFinTable() {
+  const wrap = document.getElementById('finTableWrap');
+  const ano  = parseInt(document.getElementById('finAnoFilter')?.value || 2026);
+  const data = allFin.filter(r => r.tipo === finTabAtual && r.ano === ano)
+                     .sort((a,b) => (a.colaborador_nome||'').localeCompare(b.colaborador_nome||''));
+  if (!data.length) {
+    wrap.innerHTML = `<div class="empty-state">Nenhum registro para ${FIN_TIPOS[finTabAtual]} em ${ano}.<br>Clique em "+ Adicionar" ou importe o Excel.</div>`;
+    return;
+  }
+  const totalPorMes = FIN_MESES.map(m => data.reduce((s,r) => s + (r[m]||0), 0));
+  wrap.innerHTML = `<div style="overflow-x:auto"><table class="table">
+    <thead><tr>
+      <th>Colaborador</th>
+      ${FIN_MESES_NOME.map(m=>`<th>${m.substring(0,3)}</th>`).join('')}
+      <th>Total Anual</th><th></th>
+    </tr></thead>
+    <tbody>
+      ${data.map(r => `<tr>
+        <td><strong style="color:#1a2535">${r.colaborador_nome||'—'}</strong></td>
+        ${FIN_MESES.map(m => `<td class="currency" style="white-space:nowrap">${(r[m]||0)>0?fmt(r[m]||0):'<span style="color:#cbd5e1">—</span>'}</td>`).join('')}
+        <td><strong class="currency" style="color:#0b4e7d">${fmt(r.total||0)}</strong></td>
+        <td><div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-outline" onclick='editFin("${r.id}")'>Editar</button>
+          <button class="btn btn-sm btn-danger"  onclick='deleteFin("${r.id}")'>Excluir</button>
+        </div></td>
+      </tr>`).join('')}
+      <tr style="background:#f8fafc;font-weight:700">
+        <td style="color:#0b4e7d">TOTAL</td>
+        ${totalPorMes.map(v=>`<td class="currency" style="color:#0b4e7d;white-space:nowrap">${v>0?fmt(v):'—'}</td>`).join('')}
+        <td class="currency" style="color:#0b4e7d">${fmt(totalPorMes.reduce((s,v)=>s+v,0))}</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table></div>`;
+}
+
+function openFinModal() {
+  document.getElementById('finId').value   = '';
+  document.getElementById('finNome').value = '';
+  document.getElementById('finAno').value  = document.getElementById('finAnoFilter')?.value || '2026';
+  FIN_MESES.forEach(m => { const el = document.getElementById('fin'+m.charAt(0).toUpperCase()+m.slice(1)); if(el) el.value='0'; });
+  document.getElementById('finModalTitle').textContent = 'Adicionar ' + FIN_TIPOS[finTabAtual];
+  document.getElementById('finModal').classList.add('open');
+}
+
+function editFin(id) {
+  const r = allFin.find(x => x.id === id); if (!r) return;
+  document.getElementById('finId').value   = r.id;
+  document.getElementById('finNome').value = r.colaborador_nome||'';
+  document.getElementById('finAno').value  = r.ano||2026;
+  FIN_MESES.forEach(m => { const el = document.getElementById('fin'+m.charAt(0).toUpperCase()+m.slice(1)); if(el) el.value=r[m]||0; });
+  document.getElementById('finModalTitle').textContent = 'Editar ' + FIN_TIPOS[r.tipo||finTabAtual];
+  document.getElementById('finModal').classList.add('open');
+}
+
+function closeFinModal() { document.getElementById('finModal').classList.remove('open'); }
+
+async function saveFin() {
+  const id   = document.getElementById('finId').value;
+  const nome = document.getElementById('finNome').value.trim();
+  if (!nome) { toast('Informe o nome do colaborador','e'); return; }
+  const ano  = parseInt(document.getElementById('finAno').value)||2026;
+  const colab = allColabs.find(c => c.nome.toLowerCase().trim() === nome.toLowerCase().trim());
+  const meses = {};
+  FIN_MESES.forEach(m => { meses[m] = parseFloat(document.getElementById('fin'+m.charAt(0).toUpperCase()+m.slice(1))?.value)||0; });
+  const total = Object.values(meses).reduce((s,v)=>s+v,0);
+  const payload = { tipo: finTabAtual, colaborador_nome: nome, colaborador_id: colab?colab.id:'', ano, ...meses, total };
+  try {
+    if (id) await db.collection('financeiro').doc(id).update(payload);
+    else    await db.collection('financeiro').add(payload);
+    toast(id ? 'Registro atualizado!' : 'Registro salvo!');
+    closeFinModal(); await loadFin();
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+async function deleteFin(id) {
+  if (!confirm('Excluir este registro?')) return;
+  try {
+    await db.collection('financeiro').doc(id).delete();
+    toast('Registro excluído.'); await loadFin();
+  } catch(e) { toast('Erro ao excluir','e'); }
+}
+
+function importFinExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const wb  = XLSX.read(e.target.result, { type:'array' });
+    const _nn = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    // Detecta aba e tipo de benefício
+    const abaMap = { 'vt':['transporte','vt'], 'va':['alimenta','refeic','va'], 'vho':['home','vho'], 'ac':['ajuda','custo','ac'] };
+    let abaNome = wb.SheetNames[0], tipo = finTabAtual;
+    for (const [t, terms] of Object.entries(abaMap)) {
+      const found = wb.SheetNames.find(n => terms.some(tm => _nn(n).includes(tm)));
+      if (found) { abaNome = found; tipo = t; break; }
+    }
+    const ws = wb.Sheets[abaNome];
+    const ref = ws['!ref']||'A1', rng = XLSX.utils.decode_range(ref);
+    const merges = ws['!merges']||[];
+    // Monta grade
+    const G = [];
+    for (let r=rng.s.r;r<=rng.e.r;r++) { G[r]=[]; for (let c=rng.s.c;c<=rng.e.c;c++) { const a=XLSX.utils.encode_cell({r,c}); G[r][c]=ws[a]?ws[a].v:''; } }
+    for (const m of merges) { const v=G[m.s.r]?.[m.s.c]??''; for(let r=m.s.r;r<=m.e.r;r++) for(let c=m.s.c;c<=m.e.c;c++) if(G[r]) G[r][c]=v; }
+    // Linha de cabeçalho: encontra a linha com "NOME" ou "COLABORADOR"
+    let rowHeader = rng.s.r;
+    for (let r=rng.s.r; r<=Math.min(rng.s.r+3,rng.e.r); r++) {
+      if (Object.values(G[r]||{}).some(v => /nome|colaborador/i.test(String(v)))) { rowHeader = r; break; }
+    }
+    // Detecta colunas de mês na linha de cabeçalho
+    const MESES_MAP_IMPORT = { 'janeiro':0,'fevereiro':1,'marco':2,'março':2,'abril':3,'maio':4,'junho':5,'julho':6,'agosto':7,'setembro':8,'outubro':9,'novembro':10,'dezembro':11 };
+    let colNome = -1;
+    const mesCols = {}; // { 0: colIndex, 1: colIndex, ... } month index → column index, with year
+    const anoMesCols = {}; // { '2023-0': colIndex, ... }
+    for (let c=rng.s.c; c<=rng.e.c; c++) {
+      const h = _nn(String(G[rowHeader][c]||''));
+      if (colNome===-1 && (h.includes('nome')||h.includes('colabor'))) { colNome=c; continue; }
+      // Detecta "janeiro2023", "fevereiro2024" etc.
+      for (const [mes, idx] of Object.entries(MESES_MAP_IMPORT)) {
+        if (h.startsWith(mes)) {
+          const anoMatch = h.match(/\d{4}/);
+          const ano = anoMatch ? parseInt(anoMatch[0]) : null;
+          if (ano) anoMesCols[`${ano}-${idx}`] = c;
+          break;
+        }
+      }
+    }
+    if (colNome===-1) colNome = rng.s.c;
+    // Extrai anos disponíveis
+    const anosDisp = [...new Set(Object.keys(anoMesCols).map(k => parseInt(k.split('-')[0])))].sort();
+    if (!anosDisp.length) { toast('Nenhuma coluna de mês encontrada','e'); return; }
+    // Agrupa por colaborador+ano
+    const registros = {};
+    for (let r=rowHeader+1; r<=rng.e.r; r++) {
+      const nome = String(G[r][colNome]||'').trim();
+      if (!nome || /^total/i.test(nome)) continue;
+      for (const ano of anosDisp) {
+        const key = `${nome}__${ano}`;
+        if (!registros[key]) registros[key] = { nome, ano, meses: {} };
+        for (let mi=0; mi<12; mi++) {
+          const col = anoMesCols[`${ano}-${mi}`];
+          if (col === undefined) continue;
+          const v = G[r][col];
+          const num = parseFloat(String(v||0).replace('R$','').replace(/\./g,'').replace(',','.').trim())||0;
+          if (num > 0) registros[key].meses[mi] = num;
+        }
+      }
+    }
+    const lista = Object.values(registros).filter(x => Object.keys(x.meses).length > 0);
+    if (!lista.length) { toast('Nenhum dado encontrado','e'); return; }
+    // Confirma substituição
+    const anosStr = anosDisp.join(', ');
+    const snap = await db.collection('financeiro').where('tipo','==',tipo).get();
+    const existentes = snap.docs.filter(d => anosDisp.includes(d.data().ano));
+    if (existentes.length > 0) {
+      const sub = confirm(`Já existem ${existentes.length} registros de ${FIN_TIPOS[tipo]} para os anos ${anosStr}.\n\nOK = SUBSTITUIR\nCancelar = ADICIONAR`);
+      if (sub) { const batch=db.batch(); existentes.forEach(d=>batch.delete(d.ref)); await batch.commit(); }
+    }
+    let ok=0, err=0;
+    for (const reg of lista) {
+      const colab = allColabs.find(c => _nn(c.nome) === _nn(reg.nome));
+      const mesesObj = {};
+      FIN_MESES.forEach((m,i) => { mesesObj[m] = reg.meses[i]||0; });
+      const total = Object.values(mesesObj).reduce((s,v)=>s+v,0);
+      try {
+        await db.collection('financeiro').add({ tipo, colaborador_nome:reg.nome, colaborador_id:colab?colab.id:'', ano:reg.ano, ...mesesObj, total });
+        ok++;
+      } catch { err++; }
+    }
+    toast(`${ok} registro(s) importado(s)${err?` · ${err} erro(s)`:''}`, err?'e':'s');
+    input.value='';
+    // Atualiza tab e ano
+    finTabAtual = tipo;
+    setFinTab(tipo);
+    await loadFin();
   };
   reader.readAsArrayBuffer(file);
 }
