@@ -3182,15 +3182,11 @@ function importFinExcel(input, tipoFixo) {
   reader.onload = async function(e) {
     const wb  = XLSX.read(e.target.result, { type:'array' });
     const _nn = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-    let abaNome = wb.SheetNames[0], tipo = tipoFixo || finTabAtual;
-    // Auto-detecta aba apenas se tipo não foi passado explicitamente
-    if (!tipoFixo) {
-      const abaMap = { 'vt':['transporte'], 'va':['alimenta','refeic'], 'vho':['home office','vale home'], 'ac':['ajuda de custo'] };
-      for (const [t, terms] of Object.entries(abaMap)) {
-        const found = wb.SheetNames.find(n => terms.some(tm => _nn(n).includes(tm)));
-        if (found) { abaNome = found; tipo = t; break; }
-      }
-    }
+    let tipo = tipoFixo || finTabAtual;
+    // Tenta localizar a aba pelo tipo (funciona para arquivos de uma aba só ou com nome da aba)
+    const abaTerms = { vt:['transporte'], va:['alimenta','refeic'], vho:['home office','vale home'], ac:['ajuda de custo','ajuda custo'] };
+    const found = wb.SheetNames.find(n => (abaTerms[tipo]||[]).some(tm => _nn(n).includes(tm)));
+    let abaNome = found || wb.SheetNames[0];
     const ws = wb.Sheets[abaNome];
     const ref = ws['!ref']||'A1', rng = XLSX.utils.decode_range(ref);
     const merges = ws['!merges']||[];
