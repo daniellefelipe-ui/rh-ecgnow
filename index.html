@@ -459,6 +459,10 @@
               <label style="font-size:12px;font-weight:600;color:#475569;white-space:nowrap">Dias úteis:</label>
               <input type="number" class="form-input" id="vtDiasUteis" value="22" min="1" max="31" style="width:70px" oninput="calcVT()">
             </div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#475569;cursor:pointer;white-space:nowrap">
+              <input type="checkbox" id="vtSomenteAtivos" checked onchange="calcVT()" style="width:14px;height:14px;accent-color:#0b4e7d">
+              Somente ativos
+            </label>
             <button class="btn btn-primary" onclick="salvarVTCalculado()">💾 Salvar no mês</button>
           </div>
         </div>
@@ -3047,8 +3051,15 @@ function setFinTab(tipo) {
 function calcVT() {
   const wrap = document.getElementById('vtCalcWrap');
   const dias = parseInt(document.getElementById('vtDiasUteis')?.value) || 0;
+  const somenteAtivos = document.getElementById('vtSomenteAtivos')?.checked ?? true;
   // Pega colaboradores únicos do VT (qualquer ano)
-  const colabs = [...new Map(allFin.filter(r => r.tipo === 'vt').map(r => [r.colaborador_nome, r])).values()];
+  let colabs = [...new Map(allFin.filter(r => r.tipo === 'vt').map(r => [r.colaborador_nome, r])).values()];
+  if (somenteAtivos) {
+    colabs = colabs.filter(r => {
+      const c = allColabs.find(x => x.nome.toLowerCase().trim() === r.colaborador_nome.toLowerCase().trim());
+      return c ? /^ativ/i.test(c.status||'') : true; // mantém se não encontrar no cadastro
+    });
+  }
   if (!colabs.length) { wrap.innerHTML = `<div class="empty-state">Importe o Vale Transporte para usar a calculadora.</div>`; return; }
   let totalGeral = 0;
   wrap.innerHTML = `<table class="table">
