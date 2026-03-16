@@ -3063,7 +3063,12 @@ function calcVT() {
   const wrap = document.getElementById('vtCalcWrap');
   const dias = parseInt(document.getElementById('vtDiasUteis')?.value) || 0;
   const somenteAtivos = document.getElementById('vtSomenteAtivos')?.checked ?? true;
-  let colabs = [...new Map(allFin.filter(r => r.tipo === 'vt').map(r => [r.colaborador_nome, r])).values()];
+  const _colabMap = {};
+  allFin.filter(r => r.tipo === 'vt').forEach(r => {
+    const n = r.colaborador_nome;
+    if (!_colabMap[n] || (r.valor_dia||0) > (_colabMap[n].valor_dia||0)) _colabMap[n] = r;
+  });
+  let colabs = Object.values(_colabMap);
   if (!colabs.length) { wrap.innerHTML = `<div class="empty-state">Importe o Vale Transporte para usar a calculadora.</div>`; return; }
   if (somenteAtivos) {
     colabs = colabs.filter(r => /^ativ/i.test(getColabStatus(r.colaborador_nome)));
@@ -3078,6 +3083,7 @@ function calcVT() {
       totalGeral += total;
       const ativo   = /^ativ/i.test(getColabStatus(r.colaborador_nome));
       const nomeEsc = r.colaborador_nome.replace(/'/g,"\\'");
+      const nomeId  = r.colaborador_nome.replace(/[^a-zA-Z0-9]/g,'_');
       return `<tr>
         <td><strong style="color:#1a2535">${r.colaborador_nome}</strong></td>
         <td><span class="badge ${ativo?'badge-green':'badge-red'}">${ativo?'Ativo':'Inativo'}</span></td>
@@ -3086,7 +3092,7 @@ function calcVT() {
              oninput="atualizarVtDia('${nomeEsc}',this.value)"
              placeholder="R$ 0,00"></td>
         <td style="color:#64748b">${dias} dias</td>
-        <td><strong class="currency" style="color:#0b4e7d">${fmt(total)}</strong></td>
+        <td><strong id="vtTotal_${nomeId}" class="currency" style="color:#0b4e7d">${fmt(total)}</strong></td>
         <td>${ativo
           ? `<button class="btn btn-sm btn-danger" onclick="inativarColabVT('${nomeEsc}')">Inativar</button>`
           : `<button class="btn btn-sm btn-outline" onclick="ativarColabVT('${nomeEsc}')">Ativar</button>`}
@@ -3095,7 +3101,7 @@ function calcVT() {
     }).join('')}
     <tr style="background:#f8fafc;font-weight:700">
       <td colspan="4" style="color:#0b4e7d">TOTAL</td>
-      <td class="currency" style="color:#0b4e7d">${fmt(totalGeral)}</td>
+      <td id="vtTotalGeral" class="currency" style="color:#0b4e7d">${fmt(totalGeral)}</td>
       <td></td>
     </tr></tbody></table>`;
 }
@@ -3139,18 +3145,22 @@ async function ativarColabVT(nome) {
 }
 
 function atualizarVtDia(nome, valor) {
-  // Atualiza valor_dia em memória em todos os registros desse colaborador
   const vd = parseFloat(String(valor).replace(',','.')) || 0;
   allFin.filter(r => r.tipo === 'vt' && r.colaborador_nome === nome).forEach(r => r.valor_dia = vd);
-  // Recalcula total geral
   const dias = parseInt(document.getElementById('vtDiasUteis')?.value) || 0;
-  let totalGeral = 0;
+  // Atualiza total da linha
+  const nomeId = nome.replace(/[^a-zA-Z0-9]/g,'_');
+  const rowEl = document.getElementById('vtTotal_' + nomeId);
+  if (rowEl) rowEl.textContent = fmt(parseFloat((vd * dias).toFixed(2)));
+  // Recalcula total geral (usando maior valor_dia por colaborador)
+  const _map = {};
   allFin.filter(r => r.tipo === 'vt').forEach(r => {
-    const nomes = new Set();
-    if (!nomes.has(r.colaborador_nome)) { nomes.add(r.colaborador_nome); totalGeral += (r.valor_dia||0) * dias; }
+    const n = r.colaborador_nome;
+    if (!_map[n] || (r.valor_dia||0) > (_map[n].valor_dia||0)) _map[n] = r;
   });
+  const grandTotal = Object.values(_map).reduce((s,r) => s + (r.valor_dia||0) * dias, 0);
   const el = document.getElementById('vtTotalGeral');
-  if (el) el.textContent = fmt([...new Map(allFin.filter(r=>r.tipo==='vt').map(r=>[r.colaborador_nome,r])).values()].reduce((s,r)=>s+(r.valor_dia||0)*dias,0));
+  if (el) el.textContent = fmt(parseFloat(grandTotal.toFixed(2)));
 }
 
 async function salvarVTCalculado() {
