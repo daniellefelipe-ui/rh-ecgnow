@@ -237,6 +237,8 @@
             <select class="form-select" id="hcAnoFilter" onchange="loadHeadcount()" style="width:100px">
               <option>2026</option><option>2025</option><option>2024</option>
             </select>
+            <button class="btn btn-outline" onclick="document.getElementById('hcExcelInput').click()">📥 Importar Excel</button>
+            <input type="file" id="hcExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importHcExcel(this)">
             <button class="btn btn-primary" onclick="openHcModal()">+ Adicionar</button>
           </div>
         </div>
@@ -1385,6 +1387,78 @@ async function deleteHc(id) {
     toast('Registro excluído.');
     await loadHeadcount();
   } catch(e) { toast('Erro ao excluir', 'e'); }
+}
+
+function importHcExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const wb   = XLSX.read(e.target.result, { type: 'array' });
+    const _nn  = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    // detecta aba de headcount
+    const abaNome = wb.SheetNames.find(n => _nn(n).includes('headcount')) || wb.SheetNames[0];
+    const ws   = wb.Sheets[abaNome];
+    // extrai ano do nome da aba (ex: "HEADCOUNT 2026")
+    const anoMatch = abaNome.match(/\d{4}/);
+    const ano  = anoMatch ? parseInt(anoMatch[0]) : parseInt(document.getElementById('hcAnoFilter').value);
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (!rows.length) { toast('Nenhuma linha encontrada', 'e'); return; }
+    const sample = rows[0];
+    function findCol(terms) { return Object.keys(sample).find(k => terms.some(t => _nn(k).includes(t))) || null; }
+    const colNome   = findCol(['colaborador','nome']);
+    const colIdade  = findCol(['idade']);
+    const colTipo   = findCol(['pj','clt','tipo','contrato']);
+    const colSal    = findCol(['salario bruto','salario','bruto']);
+    const colImp    = findCol(['impostos']) ;
+    const colBen    = findCol(['beneficio']);
+    const colVH     = findCol(['vale home','vale_home','home']);
+    const colSeg    = findCol(['seguranca','segurança']);
+    const colFer    = findCol(['ferias','férias']);
+    const col13     = findCol(['13']);
+    const colImpF   = findCol(['impostos ferias','impostos fér','impost']);
+    const colGW     = findCol(['gowork','posicao']);
+    const colSaude  = findCol(['seguro saude','seguro saúde','saude','saúde']);
+    if (!colNome) { toast('Coluna "Colaborador" não encontrada', 'e'); return; }
+    const registros = rows.filter(r => String(r[colNome]||'').trim()).map(r => {
+      const nome = String(r[colNome]).trim();
+      const colab = allColabs.find(c => _nn(c.nome) === _nn(nome));
+      const tipo  = colTipo ? String(r[colTipo]||'').trim().toUpperCase() : '';
+      return {
+        colaborador_id:     colab ? colab.id : '',
+        colaborador_nome:   nome,
+        tipo_contrato:      /^CLT/.test(tipo) ? 'CLT' : /^PJ/.test(tipo) ? 'PJ' : (colab ? colab.tipo_contrato||'' : ''),
+        ano,
+        idade:              parseInt(r[colIdade])||0,
+        salario_bruto:      xnum(colSal   ? r[colSal]   : 0),
+        impostos:           xnum(colImp   ? r[colImp]   : 0),
+        beneficios:         xnum(colBen   ? r[colBen]   : 0),
+        vale_home:          xnum(colVH    ? r[colVH]    : 0),
+        seguranca_trabalho: xnum(colSeg   ? r[colSeg]   : 0),
+        ferias:             xnum(colFer   ? r[colFer]   : 0),
+        decimo_terceiro:    xnum(col13    ? r[col13]    : 0),
+        impostos_ferias_13: xnum(colImpF  ? r[colImpF]  : 0),
+        posicao_gowork:     xnum(colGW    ? r[colGW]    : 0),
+        seguro_saude:       xnum(colSaude ? r[colSaude] : 0),
+      };
+    });
+    if (!registros.length) { toast('Nenhum colaborador encontrado', 'e'); return; }
+    // busca registros existentes do mesmo ano
+    const snap = await db.collection('headcount').where('ano','==',ano).get();
+    if (!snap.empty) {
+      const sub = confirm(`Já existem ${snap.size} registros para ${ano}.\n\nOK = SUBSTITUIR\nCancelar = ADICIONAR`);
+      if (sub) { const batch = db.batch(); snap.docs.forEach(d => batch.delete(d.ref)); await batch.commit(); }
+    }
+    let ok = 0, err = 0;
+    for (const p of registros) {
+      try { await db.collection('headcount').add(p); ok++; } catch { err++; }
+    }
+    toast(`${ok} colaborador(es) importado(s)${err ? ` · ${err} erro(s)` : ''}`, err ? 'e' : 's');
+    input.value = '';
+    // atualiza filtro de ano e recarrega
+    document.getElementById('hcAnoFilter').value = String(ano);
+    await loadHeadcount();
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ══ ABSENTEÍSMO ════════════════════════════════════════════
