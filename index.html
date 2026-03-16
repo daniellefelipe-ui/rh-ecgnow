@@ -3048,40 +3048,83 @@ function setFinTab(tipo) {
   renderFinKpis(); renderFinTable();
 }
 
+const _normNome = s => String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+function getColabStatus(nome) {
+  const c = allColabs.find(x => _normNome(x.nome) === _normNome(nome));
+  return c ? (c.status||'') : '';
+}
+
 function calcVT() {
   const wrap = document.getElementById('vtCalcWrap');
   const dias = parseInt(document.getElementById('vtDiasUteis')?.value) || 0;
   const somenteAtivos = document.getElementById('vtSomenteAtivos')?.checked ?? true;
-  // Pega colaboradores únicos do VT (qualquer ano)
+  // Colaboradores únicos do VT
   let colabs = [...new Map(allFin.filter(r => r.tipo === 'vt').map(r => [r.colaborador_nome, r])).values()];
+  if (!colabs.length) { wrap.innerHTML = `<div class="empty-state">Importe o Vale Transporte para usar a calculadora.</div>`; return; }
   if (somenteAtivos) {
     colabs = colabs.filter(r => {
-      const c = allColabs.find(x => x.nome.toLowerCase().trim() === r.colaborador_nome.toLowerCase().trim());
-      return c ? /^ativ/i.test(c.status||'') : true; // mantém se não encontrar no cadastro
+      const status = getColabStatus(r.colaborador_nome);
+      // se não encontrou no cadastro mostra; se encontrou filtra pelo status
+      return !status || /^ativ/i.test(status);
     });
   }
-  if (!colabs.length) { wrap.innerHTML = `<div class="empty-state">Importe o Vale Transporte para usar a calculadora.</div>`; return; }
+  if (!colabs.length) { wrap.innerHTML = `<div class="empty-state">Nenhum colaborador ativo encontrado.</div>`; return; }
   let totalGeral = 0;
   wrap.innerHTML = `<table class="table">
-    <thead><tr><th>Colaborador</th><th>Valor/Dia</th><th>Dias Úteis</th><th>Total Calculado</th></tr></thead>
+    <thead><tr><th>Colaborador</th><th>Status</th><th>Valor/Dia</th><th>Dias Úteis</th><th>Total Calculado</th><th></th></tr></thead>
     <tbody>${colabs.sort((a,b)=>a.colaborador_nome.localeCompare(b.colaborador_nome)).map(r => {
-      const vd = r.valor_dia || 0;
+      const vd    = r.valor_dia || 0;
       const total = parseFloat((vd * dias).toFixed(2));
       totalGeral += total;
+      const status = getColabStatus(r.colaborador_nome);
+      const ativo  = !status || /^ativ/i.test(status);
+      const badge  = status ? `<span class="badge ${ativo?'badge-green':'badge-red'}">${ativo?'Ativo':'Inativo'}</span>` : `<span style="color:#cbd5e1;font-size:11px">—</span>`;
+      const nomeEsc = r.colaborador_nome.replace(/'/g,"\\'");
       return `<tr>
         <td><strong style="color:#1a2535">${r.colaborador_nome}</strong></td>
+        <td>${badge}</td>
         <td><input type="number" class="form-input" style="width:110px;padding:6px 10px"
              value="${vd}" step="0.01" min="0"
-             oninput="atualizarVtDia('${r.colaborador_nome}',this.value)"
+             oninput="atualizarVtDia('${nomeEsc}',this.value)"
              placeholder="R$ 0,00"></td>
         <td style="color:#64748b">${dias} dias</td>
         <td><strong class="currency" style="color:#0b4e7d">${fmt(total)}</strong></td>
+        <td>${ativo
+          ? `<button class="btn btn-sm btn-danger" onclick="inativarColabVT('${nomeEsc}')">Inativar</button>`
+          : `<button class="btn btn-sm btn-outline" onclick="ativarColabVT('${nomeEsc}')">Ativar</button>`}
+        </td>
       </tr>`;
     }).join('')}
     <tr style="background:#f8fafc;font-weight:700">
-      <td colspan="3" style="color:#0b4e7d">TOTAL</td>
+      <td colspan="4" style="color:#0b4e7d">TOTAL</td>
       <td class="currency" style="color:#0b4e7d" id="vtTotalGeral">${fmt(totalGeral)}</td>
+      <td></td>
     </tr></tbody></table>`;
+}
+
+async function inativarColabVT(nome) {
+  const c = allColabs.find(x => _normNome(x.nome) === _normNome(nome));
+  if (!c) { toast('Colaborador não encontrado no cadastro','e'); return; }
+  if (!confirm(`Inativar ${nome}?`)) return;
+  try {
+    await db.collection('colaboradores').doc(c.id).update({ status: 'Inativo' });
+    c.status = 'Inativo';
+    toast(`${nome} inativado.`);
+    calcVT();
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+async function ativarColabVT(nome) {
+  const c = allColabs.find(x => _normNome(x.nome) === _normNome(nome));
+  if (!c) { toast('Colaborador não encontrado no cadastro','e'); return; }
+  if (!confirm(`Ativar ${nome}?`)) return;
+  try {
+    await db.collection('colaboradores').doc(c.id).update({ status: 'Ativo' });
+    c.status = 'Ativo';
+    toast(`${nome} ativado.`);
+    calcVT();
+  } catch(e) { toast('Erro: '+e.message,'e'); }
 }
 
 function atualizarVtDia(nome, valor) {
