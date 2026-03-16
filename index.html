@@ -3059,7 +3059,7 @@ function renderFinConsolidado() {
 
 function importFinExcelTipo(input, tipo) {
   finTabAtual = tipo;
-  importFinExcel(input);
+  importFinExcel(input, tipo);
 }
 
 async function limparFinDados() {
@@ -3176,18 +3176,20 @@ async function deleteFin(id) {
   } catch(e) { toast('Erro ao excluir','e'); }
 }
 
-function importFinExcel(input) {
+function importFinExcel(input, tipoFixo) {
   const file = input.files[0]; if (!file) return;
   const reader = new FileReader();
   reader.onload = async function(e) {
     const wb  = XLSX.read(e.target.result, { type:'array' });
     const _nn = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-    // Detecta aba e tipo de benefício
-    const abaMap = { 'vt':['transporte','vt'], 'va':['alimenta','refeic','va'], 'vho':['home','vho'], 'ac':['ajuda','custo','ac'] };
-    let abaNome = wb.SheetNames[0], tipo = finTabAtual;
-    for (const [t, terms] of Object.entries(abaMap)) {
-      const found = wb.SheetNames.find(n => terms.some(tm => _nn(n).includes(tm)));
-      if (found) { abaNome = found; tipo = t; break; }
+    let abaNome = wb.SheetNames[0], tipo = tipoFixo || finTabAtual;
+    // Auto-detecta aba apenas se tipo não foi passado explicitamente
+    if (!tipoFixo) {
+      const abaMap = { 'vt':['transporte'], 'va':['alimenta','refeic'], 'vho':['home office','vale home'], 'ac':['ajuda de custo'] };
+      for (const [t, terms] of Object.entries(abaMap)) {
+        const found = wb.SheetNames.find(n => terms.some(tm => _nn(n).includes(tm)));
+        if (found) { abaNome = found; tipo = t; break; }
+      }
     }
     const ws = wb.Sheets[abaNome];
     const ref = ws['!ref']||'A1', rng = XLSX.utils.decode_range(ref);
