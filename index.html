@@ -440,6 +440,31 @@
         <div id="finConsolidWrap"><div class="empty-state">Importe os dados para visualizar o consolidado.</div></div>
       </div>
 
+      <!-- Calculadora VT -->
+      <div class="card" id="vtCalcCard" style="display:none;margin-bottom:16px">
+        <div class="card-header">
+          <span class="card-title">Calculadora Vale Transporte</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:12px;font-weight:600;color:#475569">Salvar em:</label>
+            <select class="form-select" id="vtCalcMes" style="width:130px">
+              <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option>
+              <option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option>
+              <option value="6">Julho</option><option value="7">Agosto</option><option value="8">Setembro</option>
+              <option value="9">Outubro</option><option value="10">Novembro</option><option value="11">Dezembro</option>
+            </select>
+            <select class="form-select" id="vtCalcAno" style="width:100px">
+              <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+            </select>
+            <div style="display:flex;align-items:center;gap:8px">
+              <label style="font-size:12px;font-weight:600;color:#475569;white-space:nowrap">Dias úteis:</label>
+              <input type="number" class="form-input" id="vtDiasUteis" value="22" min="1" max="31" style="width:70px" oninput="calcVT()">
+            </div>
+            <button class="btn btn-primary" onclick="salvarVTCalculado()">💾 Salvar no mês</button>
+          </div>
+        </div>
+        <div id="vtCalcWrap"><div class="empty-state">Importe o Vale Transporte para usar a calculadora.</div></div>
+      </div>
+
       <!-- Visão por tipo -->
       <div class="card">
         <div class="card-header">
@@ -2992,6 +3017,7 @@ async function loadFin() {
     const snap = await db.collection('financeiro').get();
     allFin = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderFinKpis(); renderFinTable(); renderFinConsolidado();
+    if (finTabAtual === 'vt') { const c=document.getElementById('vtCalcCard'); if(c) c.style.display=''; calcVT(); }
     // Inicializa mês do consolidado com o mês atual
     const selMes = document.getElementById('finMesConsolid');
     if (selMes && selMes.value === '0') selMes.value = new Date().getMonth();
@@ -3011,7 +3037,88 @@ function setFinTab(tipo) {
     importBtn.textContent = `📥 Importar ${tipoNomes[tipo]}`;
     importBtn.onclick = () => document.getElementById('finExcel' + tipo.charAt(0).toUpperCase() + tipo.slice(1)).click();
   }
+  // Mostra/esconde calculadora VT
+  const calcCard = document.getElementById('vtCalcCard');
+  if (calcCard) calcCard.style.display = tipo === 'vt' ? '' : 'none';
+  if (tipo === 'vt') calcVT();
   renderFinKpis(); renderFinTable();
+}
+
+function calcVT() {
+  const wrap = document.getElementById('vtCalcWrap');
+  const dias = parseInt(document.getElementById('vtDiasUteis')?.value) || 0;
+  // Pega colaboradores únicos do VT (qualquer ano)
+  const colabs = [...new Map(allFin.filter(r => r.tipo === 'vt').map(r => [r.colaborador_nome, r])).values()];
+  if (!colabs.length) { wrap.innerHTML = `<div class="empty-state">Importe o Vale Transporte para usar a calculadora.</div>`; return; }
+  let totalGeral = 0;
+  wrap.innerHTML = `<table class="table">
+    <thead><tr><th>Colaborador</th><th>Valor/Dia</th><th>Dias Úteis</th><th>Total Calculado</th></tr></thead>
+    <tbody>${colabs.sort((a,b)=>a.colaborador_nome.localeCompare(b.colaborador_nome)).map(r => {
+      const vd = r.valor_dia || 0;
+      const total = parseFloat((vd * dias).toFixed(2));
+      totalGeral += total;
+      return `<tr>
+        <td><strong style="color:#1a2535">${r.colaborador_nome}</strong></td>
+        <td><input type="number" class="form-input" style="width:110px;padding:6px 10px"
+             value="${vd}" step="0.01" min="0"
+             oninput="atualizarVtDia('${r.colaborador_nome}',this.value)"
+             placeholder="R$ 0,00"></td>
+        <td style="color:#64748b">${dias} dias</td>
+        <td><strong class="currency" style="color:#0b4e7d">${fmt(total)}</strong></td>
+      </tr>`;
+    }).join('')}
+    <tr style="background:#f8fafc;font-weight:700">
+      <td colspan="3" style="color:#0b4e7d">TOTAL</td>
+      <td class="currency" style="color:#0b4e7d" id="vtTotalGeral">${fmt(totalGeral)}</td>
+    </tr></tbody></table>`;
+}
+
+function atualizarVtDia(nome, valor) {
+  // Atualiza valor_dia em memória em todos os registros desse colaborador
+  const vd = parseFloat(String(valor).replace(',','.')) || 0;
+  allFin.filter(r => r.tipo === 'vt' && r.colaborador_nome === nome).forEach(r => r.valor_dia = vd);
+  // Recalcula total geral
+  const dias = parseInt(document.getElementById('vtDiasUteis')?.value) || 0;
+  let totalGeral = 0;
+  allFin.filter(r => r.tipo === 'vt').forEach(r => {
+    const nomes = new Set();
+    if (!nomes.has(r.colaborador_nome)) { nomes.add(r.colaborador_nome); totalGeral += (r.valor_dia||0) * dias; }
+  });
+  const el = document.getElementById('vtTotalGeral');
+  if (el) el.textContent = fmt([...new Map(allFin.filter(r=>r.tipo==='vt').map(r=>[r.colaborador_nome,r])).values()].reduce((s,r)=>s+(r.valor_dia||0)*dias,0));
+}
+
+async function salvarVTCalculado() {
+  const dias = parseInt(document.getElementById('vtDiasUteis')?.value) || 0;
+  if (!dias) { toast('Informe os dias úteis','e'); return; }
+  const mes  = parseInt(document.getElementById('vtCalcMes')?.value);
+  const ano  = parseInt(document.getElementById('vtCalcAno')?.value);
+  const mesKey = FIN_MESES[mes];
+  // Colaboradores únicos do VT
+  const colabs = [...new Map(allFin.filter(r => r.tipo === 'vt').map(r => [r.colaborador_nome, r])).values()];
+  if (!colabs.some(r => r.valor_dia > 0)) { toast('Defina o valor/dia de ao menos um colaborador','e'); return; }
+  let ok = 0;
+  for (const r of colabs) {
+    const vd = r.valor_dia || 0;
+    if (!vd) continue;
+    const total_mes = parseFloat((vd * dias).toFixed(2));
+    // Encontra o registro do mesmo colaborador+ano ou cria novo
+    const reg = allFin.find(x => x.tipo === 'vt' && x.ano === ano && x.colaborador_nome === r.colaborador_nome);
+    if (reg) {
+      const upd = { [mesKey]: total_mes, valor_dia: vd };
+      // Recalcula total anual
+      const totalAnual = FIN_MESES.reduce((s,m) => s + (m === mesKey ? total_mes : (reg[m]||0)), 0);
+      upd.total = parseFloat(totalAnual.toFixed(2));
+      await db.collection('financeiro').doc(reg.id).update(upd);
+    } else {
+      const colab = allColabs.find(c => c.nome.toLowerCase().trim() === r.colaborador_nome.toLowerCase().trim());
+      const mesesObj = {}; FIN_MESES.forEach(m => { mesesObj[m] = m === mesKey ? total_mes : 0; });
+      await db.collection('financeiro').add({ tipo:'vt', colaborador_nome:r.colaborador_nome, colaborador_id:colab?colab.id:'', ano, valor_dia:vd, ...mesesObj, total:total_mes });
+    }
+    ok++;
+  }
+  toast(`VT de ${ok} colaborador(es) salvo para ${FIN_MESES_NOME[mes]}/${ano}!`);
+  await loadFin();
 }
 
 function renderFinConsolidado() {
