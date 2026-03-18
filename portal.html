@@ -705,19 +705,22 @@ function renderAprovacoes() {
 // ── Aprovações (RH) ──────────────────────────────────────────
 function renderAprovacoesRH() {
   const wrap = document.getElementById('pAprovRhWrap');
-  const pendentes = allSolicitas.filter(s => s.status==='aprovado_lider');
+  const pendentes = allSolicitas.filter(s => s.status==='pendente' || s.status==='aprovado_lider');
   if (!pendentes.length) { wrap.innerHTML=`<div class="empty-state">Nenhuma solicitação aguardando aprovação do RH.</div>`; return; }
   wrap.innerHTML = _renderSolicTable(pendentes, 'rh');
 }
 
 function _renderSolicTable(list, step) {
+  const sLabel = { pendente:'Aguard. Líder', aprovado_lider:'Aguard. RH', aprovado_rh:'Aprovada', reprovado_lider:'Reprovada (Líder)', reprovado_rh:'Reprovada (RH)' };
+  const sClass = { pendente:'badge-pending', aprovado_lider:'badge-aprvlider', aprovado_rh:'badge-green', reprovado_lider:'badge-reprov', reprovado_rh:'badge-reprov' };
   return `<table class="table">
-    <thead><tr><th>Colaborador</th><th>Período Solicitado</th><th>Dias</th><th>Tipo</th><th>Obs. Colaborador</th><th></th></tr></thead>
+    <thead><tr><th>Colaborador</th><th>Período Solicitado</th><th>Dias</th><th>Tipo</th>${step==='rh'?'<th>Etapa</th>':''}<th>Obs. Colaborador</th><th></th></tr></thead>
     <tbody>${list.map(s=>`<tr>
       <td><strong style="color:#1a2535">${s.colaborador_nome}</strong></td>
       <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
       <td style="text-align:center"><strong>${s.dias}</strong></td>
       <td><span class="badge ${s.tipo==='ferias_e_abono'?'badge-orange':s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='ferias_e_abono'?'Férias + Abono':s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
+      ${step==='rh'?`<td><span class="badge ${sClass[s.status]||'badge-blue'}">${sLabel[s.status]||s.status}</span></td>`:''}
       <td style="font-size:12px;color:#64748b">${s.obs_colaborador||'—'}</td>
       <td><button class="btn btn-sm btn-primary" onclick="openPSolicModal('${s.id}','${step}')">Analisar</button></td>
     </tr>`).join('')}</tbody></table>`;
