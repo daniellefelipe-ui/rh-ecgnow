@@ -3730,7 +3730,7 @@ function renderFerSolicitacoes() {
         <td><strong style="color:#1a2535">${s.colaborador_nome}</strong></td>
         <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
         <td style="text-align:center"><strong>${s.dias}</strong></td>
-        <td><span class="badge badge-blue">${s.tipo==='abono'?'Abono':'Férias'}</span></td>
+        <td><span class="badge ${s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
         <td><span class="badge ${statusClass[s.status]||'badge-blue'}">${statusLabel[s.status]||s.status}</span></td>
         <td style="font-size:11px;color:#94a3b8">${dt}</td>
         <td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${obs}">${obs||'—'}</td>
@@ -3895,7 +3895,7 @@ function openSolicModal(id, step) {
     <div style="background:#f8fafc;border-radius:10px;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Colaborador</div><strong>${s.colaborador_nome}</strong></div>
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Período</div>${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</div>
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong> (${s.tipo==='abono'?'Abono':'Férias'})</div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong> (${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'})</div>
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Status</div>${stepLabel[s.status]||s.status}</div>
       ${s.obs_colaborador?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Obs. Colaborador</div><div style="color:#64748b">${s.obs_colaborador}</div></div>`:''}
       ${s.obs_lider?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Obs. Líder</div><div style="color:#64748b">${s.obs_lider}</div></div>`:''}
@@ -4061,36 +4061,56 @@ async function reenviarSenha(email) {
   catch(e) { toast('Erro: '+e.message,'e'); }
 }
 
-// ── EmailJS (preencher após configuração) ─────────────────────
-const EMAILJS_SERVICE_ID  = 'SERVICE_ID_AQUI';
-const EMAILJS_PUBLIC_KEY  = 'PUBLIC_KEY_AQUI';
-const EMAILJS_TPL_LIDER   = 'template_solic_lider';   // notifica líder: nova solicitação
-const EMAILJS_TPL_RH      = 'template_solic_rh';      // notifica RH: líder aprovou
-const EMAILJS_TPL_RESULT  = 'template_resultado';     // notifica colaborador: resultado final
+// ── Web3Forms ─────────────────────────────────────────────────
+const W3F_KEY = 'f45660e4-db2c-409f-a7df-21e0058ab41b';
+const PORTAL_URL = 'https://daniellefelipe-ui.github.io/rh-ecgnow/portal.html';
 
-function initEmailJS() {
-  if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'PUBLIC_KEY_AQUI')
-    emailjs.init(EMAILJS_PUBLIC_KEY);
+async function _w3fSend(to, subject, message) {
+  try {
+    await fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ access_key: W3F_KEY, to, subject, from_name: 'RH ECGNow', message }),
+    });
+  } catch(e) { console.error('[Web3Forms] erro:', e); }
 }
 
 function enviarEmailNotificacao(tipo, solic) {
-  if (typeof emailjs === 'undefined' || EMAILJS_SERVICE_ID === 'SERVICE_ID_AQUI') {
-    console.log('[EmailJS] Aguardando configuração. Evento:', tipo); return;
+  if (!solic) return;
+  const nome   = solic.colaborador_nome;
+  const inicio = _fmtDate(solic.data_inicio);
+  const fim    = _fmtDate(solic.data_fim);
+  const dias   = solic.dias;
+  const obs    = solic.obs_colaborador || '—';
+  const link   = PORTAL_URL;
+
+  if (tipo === 'pendente') {
+    _w3fSend(
+      solic.lider_email,
+      `[RH ECGNow] Nova solicitação de férias – ${nome}`,
+      `Olá ${solic.lider_nome||'Líder'},\n\n${nome} solicitou férias:\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n• Observação: ${obs}\n\nAcesse o portal para aprovar ou reprovar:\n${link}\n\nAtenciosamente,\nRH ECGNow`
+    );
+  } else if (tipo === 'aprovado_lider') {
+    _w3fSend(
+      'danielle.felipe@ecgnow.com.br',
+      `[RH ECGNow] Aprovação pendente (RH) – ${nome}`,
+      `Olá Danielle,\n\nA solicitação de férias de ${nome} foi aprovada pelo líder e aguarda sua aprovação final:\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n\nAcesse o painel RH para aprovar ou reprovar:\n${link}\n\nAtenciosamente,\nRH ECGNow`
+    );
+  } else if (tipo === 'aprovado_rh') {
+    _w3fSend(
+      solic.colaborador_email,
+      `[RH ECGNow] Suas férias foram aprovadas!`,
+      `Olá ${nome.split(' ')[0]},\n\nSuas férias foram APROVADAS pelo RH!\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n${solic.obs_rh ? `• Observação do RH: ${solic.obs_rh}` : ''}\n\nBoas férias!\n\nAtenciosamente,\nRH ECGNow`
+    );
+  } else if (tipo === 'reprovado_lider' || tipo === 'reprovado_rh') {
+    const quem = tipo === 'reprovado_lider' ? 'líder' : 'RH';
+    const obsResp = tipo === 'reprovado_lider' ? solic.obs_lider : solic.obs_rh;
+    _w3fSend(
+      solic.colaborador_email,
+      `[RH ECGNow] Solicitação de férias reprovada`,
+      `Olá ${nome.split(' ')[0]},\n\nInfelizmente sua solicitação de férias foi reprovada pelo ${quem}.\n• Período solicitado: ${inicio} a ${fim}\n• Dias: ${dias}\n${obsResp ? `• Motivo: ${obsResp}` : ''}\n\nEntre em contato com o RH para mais informações.\n\nAtenciosamente,\nRH ECGNow`
+    );
   }
-  const params = {
-    colaborador_nome: solic?.colaborador_nome,
-    data_inicio:      _fmtDate(solic?.data_inicio),
-    data_fim:         _fmtDate(solic?.data_fim),
-    dias:             solic?.dias,
-    obs_colaborador:  solic?.obs_colaborador||'',
-    obs_lider:        solic?.obs_lider||'',
-    obs_rh:           solic?.obs_rh||'',
-    portal_url:       window.location.origin + '/portal.html',
-  };
-  if (tipo==='pendente')       emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_LIDER,  {...params, to_email: solic?.lider_email});
-  else if (tipo==='aprovado_lider') emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_RH, {...params, to_email: 'danielle.felipe@ecgnow.com.br'});
-  else if (tipo==='aprovado_rh'||tipo==='reprovado_lider'||tipo==='reprovado_rh')
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_RESULT, {...params, to_email: solic?.colaborador_email, status: tipo});
 }
 
 // ══ DASHBOARD ══════════════════════════════════════════════
