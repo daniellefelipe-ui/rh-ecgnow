@@ -1140,8 +1140,8 @@
         <input type="email" class="form-input" id="usuarioEmail" placeholder="email@ecgnow.com.br">
       </div>
       <div class="form-group">
-        <label class="form-label">Senha Temporária *</label>
-        <input type="text" class="form-input" id="usuarioSenha" value="Ecgnow@2025">
+        <label class="form-label">PIN de Acesso *</label>
+        <input type="text" class="form-input" id="usuarioSenha" placeholder="ex: 1234" maxlength="8">
       </div>
       <div class="form-group full">
         <label class="form-label">Perfil *</label>
@@ -1162,7 +1162,7 @@
     </div>
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeUsuarioModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveUsuario()">Criar Conta & Salvar</button>
+      <button class="btn btn-primary" id="btnSaveUsuario" onclick="saveUsuario()">Salvar Usuário</button>
     </div>
   </div>
 </div>
@@ -3787,7 +3787,7 @@ function renderFerUsuarios() {
   const rLabel = r => ({colaborador:'Colaborador',lider:'Líder',rh:'RH'}[r]||r);
   const rClass = r => ({colaborador:'badge-blue',lider:'badge-orange',rh:'badge-purple'}[r]||'badge-blue');
   wrap.innerHTML = `<table class="table">
-    <thead><tr><th>Nome</th><th>E-mail</th><th>Perfis</th><th>Líder</th><th>Conta</th><th></th></tr></thead>
+    <thead><tr><th>Nome</th><th>E-mail</th><th>Perfis</th><th>Líder</th><th>PIN</th><th></th></tr></thead>
     <tbody>${USUARIOS_PORTAL.map(u => {
       const cad = allFerUsuarios.find(x => x.email===u.email);
       return `<tr>
@@ -3795,19 +3795,18 @@ function renderFerUsuarios() {
         <td style="color:#64748b;font-size:12px">${u.email}</td>
         <td>${u.roles.map(r=>`<span class="badge ${rClass(r)}" style="margin-right:3px">${rLabel(r)}</span>`).join('')}</td>
         <td style="font-size:12px;color:#64748b">${u.lider_nome||'—'}</td>
-        <td>${cad?`<span class="badge badge-green">Ativa</span>`:`<span class="badge badge-red">Sem conta</span>`}</td>
+        <td style="font-size:13px;font-family:monospace;letter-spacing:2px">${cad?.pin ? cad.pin : '<span style="color:#94a3b8">—</span>'}</td>
         <td style="white-space:nowrap">
           ${!cad
-            ?`<button class="btn btn-sm btn-primary" onclick="openUsuarioModal(null,'${u.email}')">Criar Conta</button>`
-            :`<button class="btn btn-sm btn-outline" onclick="reenviarSenha('${u.email}')">Reenviar Senha</button>`}
+            ?`<button class="btn btn-sm btn-primary" onclick="openUsuarioModal(null,'${u.email}')">Cadastrar</button>`
+            :`<button class="btn btn-sm btn-outline" onclick="openUsuarioModal('${cad.id}')">Editar / PIN</button>`}
         </td>
       </tr>`;
     }).join('')}</tbody></table>
     <div style="margin-top:12px;padding:12px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:12px;color:#0369a1">
       <strong>Portal do colaborador:</strong>
       <a href="portal.html" target="_blank" style="color:#0b4e7d;font-weight:600;text-decoration:none"> Abrir portal →</a>
-      &nbsp;·&nbsp; Após criar as contas, os colaboradores acessam com o e-mail e a senha temporária.
-      Ao primeiro acesso, o sistema envia um e-mail para redefinir a senha.
+      &nbsp;·&nbsp; Colaboradores acessam com o e-mail e o PIN definido aqui. Para redefinir o PIN de alguém, clique em <strong>Editar / PIN</strong>.
     </div>`;
 }
 
@@ -3985,18 +3984,37 @@ async function reprovarSolic(id, step) {
 // ── Usuário Modal ─────────────────────────────────────────────
 function openUsuarioModal(id, emailPre) {
   document.getElementById('usuarioId').value = id||'';
-  if (emailPre) {
+  if (id) {
+    // Editar usuário existente
+    const u = allFerUsuarios.find(x=>x.id===id)||{};
+    document.getElementById('usuarioModalTitle').textContent = 'Editar Usuário';
+    document.getElementById('btnSaveUsuario').textContent    = 'Salvar Alterações';
+    document.getElementById('usuarioNome').value       = u.nome||'';
+    document.getElementById('usuarioEmail').value      = u.email||'';
+    document.getElementById('usuarioSenha').value      = u.pin||'';
+    document.getElementById('usuarioLiderNome').value  = u.lider_nome||'';
+    document.getElementById('usuarioLiderEmail').value = u.lider_email||'';
+    document.getElementById('rolColaborador').checked  = (u.roles||['colaborador']).includes('colaborador');
+    document.getElementById('rolLider').checked        = (u.roles||[]).includes('lider');
+    document.getElementById('rolRh').checked           = (u.roles||[]).includes('rh');
+  } else if (emailPre) {
     const u = USUARIOS_PORTAL.find(x=>x.email===emailPre)||{};
-    document.getElementById('usuarioNome').value        = u.nome||'';
-    document.getElementById('usuarioEmail').value       = emailPre;
-    document.getElementById('usuarioLiderNome').value   = u.lider_nome||'';
-    document.getElementById('usuarioLiderEmail').value  = u.lider_email||'';
-    document.getElementById('rolColaborador').checked   = (u.roles||['colaborador']).includes('colaborador');
-    document.getElementById('rolLider').checked         = (u.roles||[]).includes('lider');
-    document.getElementById('rolRh').checked            = (u.roles||[]).includes('rh');
+    const existing = allFerUsuarios.find(x=>x.email===emailPre);
+    document.getElementById('usuarioModalTitle').textContent = 'Cadastrar Usuário do Portal';
+    document.getElementById('btnSaveUsuario').textContent    = 'Salvar Usuário';
+    document.getElementById('usuarioNome').value       = u.nome||'';
+    document.getElementById('usuarioEmail').value      = emailPre;
+    document.getElementById('usuarioSenha').value      = existing?.pin||'1234';
+    document.getElementById('usuarioLiderNome').value  = u.lider_nome||'';
+    document.getElementById('usuarioLiderEmail').value = u.lider_email||'';
+    document.getElementById('rolColaborador').checked  = (u.roles||['colaborador']).includes('colaborador');
+    document.getElementById('rolLider').checked        = (u.roles||[]).includes('lider');
+    document.getElementById('rolRh').checked           = (u.roles||[]).includes('rh');
   } else {
+    document.getElementById('usuarioModalTitle').textContent = 'Cadastrar Usuário do Portal';
+    document.getElementById('btnSaveUsuario').textContent    = 'Salvar Usuário';
     ['usuarioNome','usuarioEmail','usuarioLiderNome','usuarioLiderEmail'].forEach(i=>document.getElementById(i).value='');
-    document.getElementById('usuarioSenha').value = 'Ecgnow@2025';
+    document.getElementById('usuarioSenha').value = '1234';
     document.getElementById('rolColaborador').checked = true;
     document.getElementById('rolLider').checked = document.getElementById('rolRh').checked = false;
   }
@@ -4006,62 +4024,32 @@ function closeUsuarioModal() { document.getElementById('usuarioModal').classList
 
 async function saveUsuario() {
   const nome  = document.getElementById('usuarioNome').value.trim();
-  const email = document.getElementById('usuarioEmail').value.trim();
-  const senha = document.getElementById('usuarioSenha').value.trim();
-  if (!nome||!email||!senha||senha.length<6) { toast('Preencha todos os campos (senha mín. 6 chars)','e'); return; }
+  const email = document.getElementById('usuarioEmail').value.trim().toLowerCase();
+  const pin   = document.getElementById('usuarioSenha').value.trim();
+  if (!nome||!email||!pin||pin.length<4) { toast('Preencha todos os campos (PIN mín. 4 caracteres)','e'); return; }
   const roles = ['colaborador','lider','rh'].filter(r => document.getElementById('rol'+r.charAt(0).toUpperCase()+r.slice(1)).checked);
   const userData = {
-    nome, email, roles,
+    nome, email, pin, roles,
     lider_nome:  document.getElementById('usuarioLiderNome').value.trim(),
     lider_email: document.getElementById('usuarioLiderEmail').value.trim(),
-    criado_em:   firebase.firestore.FieldValue.serverTimestamp(),
   };
   try {
-    // Cria conta usando app secundário para não deslogar o usuário atual
-    const _cfg = { apiKey:"AIzaSyBopJe43OvWuA-vuHWGCTqQ_ApreNf_kWA", authDomain:"rh-ecgnow.firebaseapp.com", projectId:"rh-ecgnow", storageBucket:"rh-ecgnow.firebasestorage.app", messagingSenderId:"130728187614", appId:"1:130728187614:web:bb1fb39b10be2119c7d44f" };
-    const sec  = firebase.initializeApp(_cfg, 'sec_'+Date.now());
-    const sAuth= sec.auth();
-    let uid;
-    try {
-      const cred = await sAuth.createUserWithEmailAndPassword(email, senha);
-      uid = cred.user.uid;
-    } catch(authErr) {
-      if (authErr.code==='auth/email-already-in-use') {
-        let existingUid;
-        if (email === auth.currentUser?.email) {
-          // Usuário atual logado — pega UID direto
-          existingUid = auth.currentUser.uid;
-        } else {
-          // Tenta logar com a senha informada
-          try {
-            const cred2 = await sAuth.signInWithEmailAndPassword(email, senha);
-            existingUid = cred2.user.uid;
-          } catch(e2) {
-            // Senha incorreta — salva perfil usando e-mail como ID do documento
-            // (loadUserProfile faz fallback por e-mail, então vai funcionar)
-            existingUid = null;
-          }
-        }
-        await sAuth.signOut(); sec.delete();
-        const docId = existingUid || ('email_' + email.replace(/[@.]/g,'_'));
-        await db.collection('usuarios').doc(docId).set(userData);
-        const exIdx = allFerUsuarios.findIndex(u=>u.email===email);
-        if (exIdx>=0) allFerUsuarios[exIdx]={id:docId,...userData};
-        else allFerUsuarios.push({id:docId,...userData});
-        // Envia e-mail para o colaborador definir/redefinir a senha
-        try { await auth.sendPasswordResetEmail(email); } catch(_){}
-        closeUsuarioModal(); renderFerUsuarios();
-        toast(`Perfil salvo! E-mail de acesso enviado para ${email}`);
-        return;
-      }
-      throw authErr;
+    const existingId = document.getElementById('usuarioId').value;
+    let docId;
+    if (existingId) {
+      await db.collection('usuarios').doc(existingId).update(userData);
+      docId = existingId;
+      const idx = allFerUsuarios.findIndex(u=>u.id===existingId);
+      if (idx>=0) allFerUsuarios[idx] = {id:docId,...userData};
+    } else {
+      docId = 'email_' + email.replace(/[@.]/g,'_');
+      await db.collection('usuarios').doc(docId).set({...userData, criado_em:firebase.firestore.FieldValue.serverTimestamp()});
+      const exIdx = allFerUsuarios.findIndex(u=>u.email===email);
+      if (exIdx>=0) allFerUsuarios[exIdx]={id:docId,...userData};
+      else allFerUsuarios.push({id:docId,...userData});
     }
-    await sAuth.signOut(); sec.delete();
-    await db.collection('usuarios').doc(uid).set(userData);
-    allFerUsuarios.push({id:uid,...userData});
-    await auth.sendPasswordResetEmail(email);
     closeUsuarioModal(); renderFerUsuarios();
-    toast(`Conta criada! E-mail de acesso enviado para ${email}`);
+    toast(existingId ? 'Usuário atualizado!' : `Usuário criado! PIN: ${pin}`);
   } catch(e) { toast('Erro: '+e.message,'e'); }
 }
 
