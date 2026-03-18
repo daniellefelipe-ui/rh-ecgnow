@@ -181,21 +181,31 @@
           </div>
           <div class="form-group">
             <label class="form-label">Tipo *</label>
-            <select class="form-select" id="sReqTipo">
+            <select class="form-select" id="sReqTipo" onchange="onSReqTipoChange()">
               <option value="ferias">Férias</option>
-              <option value="abono">Abono</option>
+              <option value="abono_pecuniario">Abono Pecuniário (venda de 10 dias)</option>
             </select>
           </div>
           <div class="form-group">
             <label class="form-label" id="sReqDiasLbl">Dias disponíveis: —</label>
           </div>
-          <div class="form-group">
-            <label class="form-label">Data de Início *</label>
-            <input type="date" class="form-input" id="sReqInicio" oninput="calcSReqDias()">
+          <div id="sReqDatasWrap">
+            <div class="form-grid" style="margin-top:0">
+              <div class="form-group">
+                <label class="form-label">Data de Início *</label>
+                <input type="date" class="form-input" id="sReqInicio" oninput="calcSReqDias()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Data de Fim *</label>
+                <input type="date" class="form-input" id="sReqFim" oninput="calcSReqDias()">
+              </div>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Data de Fim *</label>
-            <input type="date" class="form-input" id="sReqFim" oninput="calcSReqDias()">
+          <div id="sReqAbonoInfo" style="display:none;grid-column:1/-1">
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px;font-size:13px;color:#92400e">
+              <strong>Abono Pecuniário</strong> — Você está solicitando a venda de <strong>10 dias</strong> de férias.<br>
+              Esses 10 dias serão deduzidos do seu saldo e você receberá o valor correspondente em folha.
+            </div>
           </div>
           <div class="form-group full">
             <label class="form-label">Observação</label>
@@ -285,13 +295,9 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-// ── EmailJS (descomentar e preencher após configuração) ───────
-const EMAILJS_SERVICE_ID = 'SERVICE_ID_AQUI';
-const EMAILJS_PUBLIC_KEY = 'PUBLIC_KEY_AQUI';
-const EMAILJS_TPL_LIDER  = 'template_solic_lider';
-const EMAILJS_TPL_RH     = 'template_solic_rh';
-const EMAILJS_TPL_RESULT = 'template_resultado';
-// if (typeof emailjs !== 'undefined') emailjs.init(EMAILJS_PUBLIC_KEY);
+// ── Web3Forms ─────────────────────────────────────────────────
+const W3F_KEY    = 'f45660e4-db2c-409f-a7df-21e0058ab41b';
+const PORTAL_URL = 'https://daniellefelipe-ui.github.io/rh-ecgnow/portal.html';
 
 // ── State ────────────────────────────────────────────────────
 let currentUser = null;
@@ -463,7 +469,7 @@ function renderMinhasSolics() {
       return `<tr>
         <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
         <td style="text-align:center"><strong>${s.dias}</strong></td>
-        <td><span class="badge badge-blue">${s.tipo==='abono'?'Abono':'Férias'}</span></td>
+        <td><span class="badge ${s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
         <td><span class="badge ${sClass[s.status]||'badge-blue'}">${sLabel[s.status]||s.status}</span></td>
         <td style="font-size:11px;color:#94a3b8">${dt}</td>
         <td style="font-size:12px;color:#64748b">${s.obs_lider||'—'}</td>
@@ -479,12 +485,45 @@ function populateSReqPeriodo() {
     available.map(p=>`<option value="${p.id}">${_fmtDate(p.periodo_inicio)} – ${_fmtDate(p.periodo_fim)} (${_calcSaldo(p).saldo} dias disponíveis)</option>`).join('');
 }
 
+function onSReqTipoChange() {
+  const tipo = document.getElementById('sReqTipo').value;
+  const isAbono = tipo === 'abono_pecuniario';
+  document.getElementById('sReqDatasWrap').style.display  = isAbono ? 'none' : 'block';
+  document.getElementById('sReqAbonoInfo').style.display  = isAbono ? 'block' : 'none';
+  document.getElementById('sReqDiasInfo').style.display   = 'none';
+  if (isAbono) {
+    document.getElementById('sReqInicio').value = '';
+    document.getElementById('sReqFim').value    = '';
+  }
+  onSReqPeriodoChange();
+}
+
 function onSReqPeriodoChange() {
-  const id = document.getElementById('sReqPeriodo').value;
-  const p  = myPeriodos.find(x=>x.id===id);
-  const lbl = document.getElementById('sReqDiasLbl');
-  if (p) { const {saldo}=_calcSaldo(p); lbl.textContent=`Dias disponíveis: ${saldo}`; }
-  else lbl.textContent = 'Dias disponíveis: —';
+  const id   = document.getElementById('sReqPeriodo').value;
+  const p    = myPeriodos.find(x=>x.id===id);
+  const lbl  = document.getElementById('sReqDiasLbl');
+  const tipo = document.getElementById('sReqTipo').value;
+  if (p) {
+    const {saldo} = _calcSaldo(p);
+    lbl.textContent = `Dias disponíveis: ${saldo}`;
+    if (tipo === 'abono_pecuniario') {
+      const infoEl = document.getElementById('sReqDiasInfo');
+      const calcEl = document.getElementById('sReqDiasCalc');
+      if (saldo >= 10) {
+        calcEl.textContent = `10 dias serão deduzidos do seu saldo. Saldo restante após aprovação: ${saldo - 10} dias.`;
+        infoEl.style.display = 'block';
+      } else {
+        calcEl.textContent = `Saldo insuficiente. Você precisa de pelo menos 10 dias disponíveis para solicitar o abono pecuniário.`;
+        infoEl.style.background = '#fef2f2';
+        infoEl.querySelector('div').style.background = '#fef2f2';
+        infoEl.querySelector('div').style.borderColor = '#fecaca';
+        infoEl.querySelector('div').style.color = '#b91c1c';
+        infoEl.style.display = 'block';
+      }
+    }
+  } else {
+    lbl.textContent = 'Dias disponíveis: —';
+  }
 }
 
 function calcSReqDias() {
@@ -505,16 +544,29 @@ function calcSReqDias() {
 async function enviarSolicitacao() {
   const periodoId = document.getElementById('sReqPeriodo').value;
   const tipo      = document.getElementById('sReqTipo').value;
-  const inicio    = document.getElementById('sReqInicio').value;
-  const fim       = document.getElementById('sReqFim').value;
   const obs       = document.getElementById('sReqObs').value.trim();
-  if (!periodoId||!inicio||!fim) { toast('Preencha todos os campos obrigatórios','e'); return; }
-  const dias = Math.round((new Date(fim+'T12:00:00')-new Date(inicio+'T12:00:00'))/86400000)+1;
-  if (dias<=0) { toast('Data de fim deve ser após a data de início','e'); return; }
+  const isAbono   = tipo === 'abono_pecuniario';
+
+  if (!periodoId) { toast('Selecione o período aquisitivo','e'); return; }
   const p = myPeriodos.find(x=>x.id===periodoId);
   if (!p) { toast('Período não encontrado','e'); return; }
   const {saldo} = _calcSaldo(p);
-  if (dias > saldo) { toast(`Saldo insuficiente. Você tem ${saldo} dias disponíveis`,'e'); return; }
+
+  let inicio, fim, dias;
+  if (isAbono) {
+    if (saldo < 10) { toast('Saldo insuficiente. Você precisa de pelo menos 10 dias disponíveis.','e'); return; }
+    dias   = 10;
+    // usa datas do período como referência
+    inicio = p.periodo_inicio;
+    fim    = p.periodo_fim;
+  } else {
+    inicio = document.getElementById('sReqInicio').value;
+    fim    = document.getElementById('sReqFim').value;
+    if (!inicio||!fim) { toast('Preencha as datas de início e fim','e'); return; }
+    dias = Math.round((new Date(fim+'T12:00:00')-new Date(inicio+'T12:00:00'))/86400000)+1;
+    if (dias<=0) { toast('Data de fim deve ser após a data de início','e'); return; }
+    if (dias > saldo) { toast(`Saldo insuficiente. Você tem ${saldo} dias disponíveis`,'e'); return; }
+  }
 
   const data = {
     colaborador_uid:   currentUser.uid,
@@ -667,7 +719,7 @@ function _renderSolicTable(list, step) {
       <td><strong style="color:#1a2535">${s.colaborador_nome}</strong></td>
       <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
       <td style="text-align:center"><strong>${s.dias}</strong></td>
-      <td><span class="badge badge-blue">${s.tipo==='abono'?'Abono':'Férias'}</span></td>
+      <td><span class="badge ${s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
       <td style="font-size:12px;color:#64748b">${s.obs_colaborador||'—'}</td>
       <td><button class="btn btn-sm btn-primary" onclick="openPSolicModal('${s.id}','${step}')">Analisar</button></td>
     </tr>`).join('')}</tbody></table>`;
@@ -681,7 +733,7 @@ function openPSolicModal(id, step) {
     <div style="background:#f8fafc;border-radius:10px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Colaborador</div><strong>${s.colaborador_nome}</strong></div>
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Período</div>${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</div>
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong> (${s.tipo==='abono'?'Abono':'Férias'})</div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong> (${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'})</div>
       ${s.obs_colaborador?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Obs.</div>${s.obs_colaborador}</div>`:''}
     </div>`;
   document.getElementById('pSolicObs').value = '';
@@ -726,27 +778,52 @@ async function pReprovar(id, step) {
   } catch(e) { toast('Erro: '+e.message,'e'); }
 }
 
-// ── EmailJS ──────────────────────────────────────────────────
+// ── Web3Forms ────────────────────────────────────────────────
+async function _w3fSend(to, subject, message) {
+  try {
+    await fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ access_key: W3F_KEY, to, subject, from_name: 'RH ECGNow', message }),
+    });
+  } catch(e) { console.error('[Web3Forms] erro:', e); }
+}
+
 function enviarEmail(tipo, solic) {
-  if (typeof emailjs==='undefined'||EMAILJS_SERVICE_ID==='SERVICE_ID_AQUI') {
-    console.log('[EmailJS] Aguardando configuração. Evento:', tipo); return;
+  if (!solic) return;
+  const nome   = solic.colaborador_nome;
+  const inicio = _fmtDate(solic.data_inicio);
+  const fim    = _fmtDate(solic.data_fim);
+  const dias   = solic.dias;
+  const obs    = solic.obs_colaborador || '—';
+
+  if (tipo === 'pendente') {
+    _w3fSend(
+      solic.lider_email,
+      `[RH ECGNow] Nova solicitação de férias – ${nome}`,
+      `Olá ${solic.lider_nome||'Líder'},\n\n${nome} solicitou férias:\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n• Observação: ${obs}\n\nAcesse o portal para aprovar ou reprovar:\n${PORTAL_URL}\n\nAtenciosamente,\nRH ECGNow`
+    );
+  } else if (tipo === 'aprovado_lider') {
+    _w3fSend(
+      'danielle.felipe@ecgnow.com.br',
+      `[RH ECGNow] Aprovação pendente (RH) – ${nome}`,
+      `Olá Danielle,\n\nA solicitação de férias de ${nome} foi aprovada pelo líder e aguarda sua aprovação final:\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n\nAcesse o painel RH:\n${PORTAL_URL}\n\nAtenciosamente,\nRH ECGNow`
+    );
+  } else if (tipo === 'aprovado_rh') {
+    _w3fSend(
+      solic.colaborador_email,
+      `[RH ECGNow] Suas férias foram aprovadas!`,
+      `Olá ${nome.split(' ')[0]},\n\nSuas férias foram APROVADAS!\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n${solic.obs_rh?`• Obs: ${solic.obs_rh}`:''}\n\nBoas férias!\n\nAtenciosamente,\nRH ECGNow`
+    );
+  } else if (tipo === 'reprovado_lider' || tipo === 'reprovado_rh') {
+    const quem = tipo === 'reprovado_lider' ? 'líder' : 'RH';
+    const obsResp = tipo === 'reprovado_lider' ? solic.obs_lider : solic.obs_rh;
+    _w3fSend(
+      solic.colaborador_email,
+      `[RH ECGNow] Solicitação de férias reprovada`,
+      `Olá ${nome.split(' ')[0]},\n\nSua solicitação de férias foi reprovada pelo ${quem}.\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n${obsResp?`• Motivo: ${obsResp}`:''}\n\nEntre em contato com o RH para mais informações.\n\nAtenciosamente,\nRH ECGNow`
+    );
   }
-  const params = {
-    colaborador_nome: solic?.colaborador_nome,
-    data_inicio:      _fmtDate(solic?.data_inicio),
-    data_fim:         _fmtDate(solic?.data_fim),
-    dias:             solic?.dias,
-    obs_colaborador:  solic?.obs_colaborador||'',
-    obs_lider:        solic?.obs_lider||'',
-    obs_rh:           solic?.obs_rh||'',
-    portal_url:       window.location.href,
-  };
-  if (tipo==='pendente')
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_LIDER,  {...params, to_email:solic?.lider_email});
-  else if (tipo==='aprovado_lider')
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_RH,     {...params, to_email:'danielle.felipe@ecgnow.com.br'});
-  else
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_RESULT, {...params, to_email:solic?.colaborador_email, status:tipo});
 }
 
 // ── Toast ────────────────────────────────────────────────────
