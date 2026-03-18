@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Férias · ECGNow</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- EmailJS: descomentar após configuração
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html,body { height:100%; font-family:'DM Sans',sans-serif; font-size:14px; background:#edf0f7; color:#1a2535; }
+
+    /* ── Login ── */
+    .login-page { min-height:100vh; background:linear-gradient(135deg,#071e34 0%,#0c3d67 50%,#0a5a9e 100%); display:flex; align-items:center; justify-content:center; }
+    .login-box  { background:white; border-radius:20px; padding:48px 40px; width:390px; box-shadow:0 24px 80px rgba(0,0,0,.35); }
+    .login-logo { font-family:'Plus Jakarta Sans',sans-serif; font-size:28px; font-weight:800; color:#071e34; text-align:center; margin-bottom:4px; }
+    .login-logo span { color:#1a8fe3; }
+    .login-sub  { text-align:center; color:#94a3b8; font-size:12px; margin-bottom:32px; }
+    .login-field { margin-bottom:16px; }
+    .login-field label { display:block; font-size:11px; font-weight:600; color:#64748b; margin-bottom:6px; text-transform:uppercase; letter-spacing:.07em; }
+    .login-field input { width:100%; padding:12px 16px; border:1.5px solid #e2e8f0; border-radius:10px; font-size:14px; font-family:'DM Sans',sans-serif; outline:none; background:#fafbfc; }
+    .login-field input:focus { border-color:#1a8fe3; box-shadow:0 0 0 3px rgba(26,143,227,.1); }
+    .login-btn  { width:100%; padding:13px; background:linear-gradient(135deg,#0b4e7d,#1a8fe3); color:white; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; margin-top:6px; }
+    .login-btn:hover { opacity:.92; }
+    .login-error { color:#e05555; font-size:12px; text-align:center; margin-top:10px; min-height:18px; }
+    .login-forgot { text-align:center; margin-top:12px; }
+    .login-forgot a { color:#1a8fe3; font-size:12px; cursor:pointer; text-decoration:none; }
+
+    /* ── App ── */
+    .app   { display:flex; flex-direction:column; min-height:100vh; }
+    .topbar { background:linear-gradient(90deg,#071e34,#0b4e7d); padding:0 28px; display:flex; align-items:center; justify-content:space-between; height:56px; border-bottom:3px solid #1a8fe3; }
+    .topbar-logo { font-family:'Plus Jakarta Sans',sans-serif; font-weight:800; font-size:17px; color:white; }
+    .topbar-logo span { color:#38bdf8; }
+    .topbar-user { display:flex; align-items:center; gap:14px; }
+    .topbar-name { font-size:13px; color:rgba(255,255,255,.75); }
+    .logout-btn  { padding:6px 14px; border-radius:8px; font-size:12px; color:rgba(255,255,255,.55); cursor:pointer; border:1px solid rgba(255,255,255,.15); background:transparent; font-family:'DM Sans',sans-serif; }
+    .logout-btn:hover { color:white; border-color:rgba(255,255,255,.4); }
+
+    .portal-body { flex:1; padding:32px 28px; max-width:960px; margin:0 auto; width:100%; }
+
+    /* ── Nav tabs ── */
+    .portal-nav { display:flex; gap:4px; margin-bottom:24px; background:white; padding:6px; border-radius:12px; border:1px solid #e2e8f0; flex-wrap:wrap; }
+    .portal-tab { padding:8px 18px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:none; font-family:'DM Sans',sans-serif; color:#64748b; background:transparent; transition:all .15s; }
+    .portal-tab:hover { background:#f1f5f9; color:#0b4e7d; }
+    .portal-tab.active { background:linear-gradient(135deg,#0b4e7d,#1a8fe3); color:white; box-shadow:0 2px 8px rgba(11,78,125,.25); }
+
+    /* ── Cards ── */
+    .card  { background:white; border:1px solid rgba(213,220,235,.9); border-radius:14px; padding:24px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.03); }
+    .card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid #f1f5f9; flex-wrap:wrap; gap:8px; }
+    .card-title  { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#0b4e7d; display:flex; align-items:center; gap:8px; }
+    .card-title::before { content:''; width:3px; height:14px; background:linear-gradient(180deg,#1a8fe3,#06b6d4); border-radius:2px; display:inline-block; }
+
+    /* ── KPI ── */
+    .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
+    .kpi-card { background:white; border:1px solid rgba(213,220,235,.9); border-radius:12px; padding:18px 20px; position:relative; overflow:hidden; }
+    .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#0b4e7d,#1a8fe3,#06b6d4); }
+    .kpi-lbl { font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#94a3b8; margin-bottom:10px; }
+    .kpi-val { font-family:'Plus Jakarta Sans',sans-serif; font-size:26px; font-weight:800; color:#071e34; }
+    .kpi-sub { font-size:11px; color:#94a3b8; margin-top:6px; }
+
+    /* ── Table ── */
+    .table { width:100%; border-collapse:collapse; }
+    .table thead tr { background:#f8fafc; }
+    .table th { font-size:9px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase; color:#64748b; padding:10px 14px; text-align:left; border-bottom:2px solid #e8edf5; white-space:nowrap; }
+    .table td { padding:12px 14px; font-size:13px; color:#334155; border-bottom:1px solid #f1f5f9; }
+    .table tbody tr:hover td { background:#eff6ff; }
+
+    /* ── Badges ── */
+    .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700; }
+    .badge-green   { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+    .badge-red     { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+    .badge-blue    { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+    .badge-orange  { background:#fffbeb; color:#b45309; border:1px solid #fde68a; }
+    .badge-pending { background:#fffbeb; color:#b45309; border:1px solid #fde68a; }
+    .badge-aprvlider{ background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+    .badge-reprov  { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+
+    /* ── Buttons ── */
+    .btn { padding:9px 18px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:none; font-family:'DM Sans',sans-serif; transition:all .15s; }
+    .btn-primary { background:linear-gradient(135deg,#0b4e7d,#1169a8); color:white; box-shadow:0 2px 8px rgba(11,78,125,.25); }
+    .btn-primary:hover { box-shadow:0 4px 16px rgba(11,78,125,.35); transform:translateY(-1px); }
+    .btn-outline { background:white; color:#0b4e7d; border:1.5px solid #bfdbfe; }
+    .btn-outline:hover { background:#eff6ff; }
+    .btn-danger  { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+    .btn-sm { padding:5px 12px; font-size:11px; }
+
+    /* ── Forms ── */
+    .form-grid  { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .form-group { display:flex; flex-direction:column; gap:5px; }
+    .form-group.full { grid-column:1/-1; }
+    .form-label { font-size:11px; font-weight:600; color:#475569; text-transform:uppercase; letter-spacing:.07em; }
+    .form-input,.form-select { padding:10px 14px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:13px; font-family:'DM Sans',sans-serif; color:#1e293b; outline:none; background:#fafbfc; width:100%; }
+    .form-input:focus,.form-select:focus { border-color:#1a8fe3; box-shadow:0 0 0 3px rgba(26,143,227,.08); }
+    .form-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid #f1f5f9; }
+
+    /* ── Modal ── */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(7,30,52,.55); backdrop-filter:blur(4px); z-index:100; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:white; border-radius:18px; padding:32px; width:540px; max-width:95vw; max-height:90vh; overflow-y:auto; box-shadow:0 24px 80px rgba(0,0,0,.2); }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; padding-bottom:14px; border-bottom:1px solid #f1f5f9; }
+    .modal-title  { font-family:'Plus Jakarta Sans',sans-serif; font-size:17px; font-weight:700; color:#071e34; }
+    .modal-close  { background:#f1f5f9; border:none; width:28px; height:28px; border-radius:8px; font-size:16px; color:#64748b; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .modal-close:hover { background:#fee2e2; color:#dc2626; }
+
+    /* ── Misc ── */
+    .empty-state { text-align:center; padding:48px 24px; color:#94a3b8; font-size:13px; }
+    .page-section { display:none; }
+    .page-section.active { display:block; }
+    .vence-critico { background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700; }
+    .vence-atencao { background:#fffbeb;color:#b45309;border:1px solid #fde68a;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700; }
+    .vence-ok      { background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700; }
+
+    /* ── Toast ── */
+    #toast { position:fixed; bottom:24px; right:24px; padding:12px 20px; border-radius:10px; font-size:13px; font-weight:500; z-index:999; display:none; box-shadow:0 8px 30px rgba(0,0,0,.18); }
+    #toast.show-s { display:block; background:linear-gradient(135deg,#0b4e7d,#1a8fe3); color:white; }
+    #toast.show-e { display:block; background:linear-gradient(135deg,#b91c1c,#e05555); color:white; }
+
+    @media(max-width:600px) {
+      .portal-body { padding:16px 14px; }
+      .form-grid { grid-template-columns:1fr; }
+      .kpi-grid  { grid-template-columns:1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginPage" class="login-page">
+  <div class="login-box">
+    <div class="login-logo">RH<span>.</span>ECGNow</div>
+    <p class="login-sub">Portal do Colaborador</p>
+    <div class="login-field">
+      <label>E-mail</label>
+      <input type="email" id="loginEmail" placeholder="seu@ecgnow.com.br" onkeydown="if(event.key==='Enter')login()">
+    </div>
+    <div class="login-field">
+      <label>Senha</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+    </div>
+    <button class="login-btn" onclick="login()">Entrar</button>
+    <p class="login-error" id="loginError"></p>
+    <div class="login-forgot"><a onclick="esqueciSenha()">Esqueci minha senha</a></div>
+  </div>
+</div>
+
+<!-- PORTAL -->
+<div id="appPage" class="app" style="display:none">
+  <header class="topbar">
+    <div class="topbar-logo">RH<span>.</span>ECGNow &nbsp;<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,.4)">Portal do Colaborador</span></div>
+    <div class="topbar-user">
+      <span class="topbar-name" id="topbarName"></span>
+      <button class="logout-btn" onclick="logout()">↩ Sair</button>
+    </div>
+  </header>
+
+  <div class="portal-body">
+    <nav class="portal-nav" id="portalNav"></nav>
+
+    <section class="page-section active" id="sec-minhasferias">
+      <div class="kpi-grid" id="pKpis"><div class="kpi-card"><div class="kpi-lbl">Carregando...</div><div class="kpi-val">—</div></div></div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Meus Períodos Aquisitivos</span></div>
+        <div id="pPeriodosWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
+
+    <section class="page-section" id="sec-solicitar">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Solicitar Férias</span></div>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label class="form-label">Período Aquisitivo *</label>
+            <select class="form-select" id="sReqPeriodo" onchange="onSReqPeriodoChange()">
+              <option value="">Selecione o período...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo *</label>
+            <select class="form-select" id="sReqTipo">
+              <option value="ferias">Férias</option>
+              <option value="abono">Abono</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" id="sReqDiasLbl">Dias disponíveis: —</label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Início *</label>
+            <input type="date" class="form-input" id="sReqInicio" oninput="calcSReqDias()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Fim *</label>
+            <input type="date" class="form-input" id="sReqFim" oninput="calcSReqDias()">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Observação</label>
+            <textarea class="form-input" id="sReqObs" rows="3" style="resize:vertical" placeholder="Informações adicionais (opcional)..."></textarea>
+          </div>
+          <div class="form-group full" id="sReqDiasInfo" style="display:none">
+            <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;font-size:13px;color:#0369a1">
+              <strong id="sReqDiasCalc"></strong>
+            </div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="enviarSolicitacao()">Enviar Solicitação</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section" id="sec-minhassolics">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Minhas Solicitações</span></div>
+        <div id="pSolicsWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
+
+    <section class="page-section" id="sec-aprovacoes">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Solicitações Pendentes da Equipe</span>
+        </div>
+        <div id="pAprovWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
+
+    <section class="page-section" id="sec-aprovacoes-rh">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Aprovações RH – Aguardando Decisão</span>
+        </div>
+        <div id="pAprovRhWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- MODAL APROVAR/REPROVAR (líder/rh) -->
+<div class="modal-overlay" id="pSolicModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Solicitação de Férias</span>
+      <button class="modal-close" onclick="closePSolicModal()">×</button>
+    </div>
+    <input type="hidden" id="pSolicId">
+    <input type="hidden" id="pSolicStep">
+    <div id="pSolicInfo" style="margin-bottom:16px"></div>
+    <div class="form-group">
+      <label class="form-label">Observação</label>
+      <textarea class="form-input" id="pSolicObs" rows="3" style="resize:vertical" placeholder="Comentário opcional..."></textarea>
+    </div>
+    <div id="pSolicActions" class="form-actions"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyBopJe43OvWuA-vuHWGCTqQ_ApreNf_kWA",
+  authDomain: "rh-ecgnow.firebaseapp.com",
+  projectId: "rh-ecgnow",
+  storageBucket: "rh-ecgnow.firebasestorage.app",
+  messagingSenderId: "130728187614",
+  appId: "1:130728187614:web:bb1fb39b10be2119c7d44f"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+// ── EmailJS (descomentar e preencher após configuração) ───────
+const EMAILJS_SERVICE_ID = 'SERVICE_ID_AQUI';
+const EMAILJS_PUBLIC_KEY = 'PUBLIC_KEY_AQUI';
+const EMAILJS_TPL_LIDER  = 'template_solic_lider';
+const EMAILJS_TPL_RH     = 'template_solic_rh';
+const EMAILJS_TPL_RESULT = 'template_resultado';
+// if (typeof emailjs !== 'undefined') emailjs.init(EMAILJS_PUBLIC_KEY);
+
+// ── State ────────────────────────────────────────────────────
+let currentUser = null;
+let userProfile = null;   // from 'usuarios' collection
+let myPeriodos  = [];
+let allSolicitas= [];
+
+// ── Auth ─────────────────────────────────────────────────────
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    currentUser = user;
+    await loadUserProfile(user.uid, user.email);
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('appPage').style.display   = 'flex';
+    buildPortalNav();
+    await loadPortalData();
+  } else {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('appPage').style.display   = 'none';
+  }
+});
+
+async function loadUserProfile(uid, email) {
+  try {
+    const doc = await db.collection('usuarios').doc(uid).get();
+    if (doc.exists) {
+      userProfile = { id: uid, ...doc.data() };
+    } else {
+      // Fallback: tenta buscar por email
+      const snap = await db.collection('usuarios').where('email','==',email).limit(1).get();
+      userProfile = snap.empty ? { id:uid, nome:email, email, roles:['colaborador'], lider_email:'', lider_nome:'' }
+                               : { id:snap.docs[0].id, ...snap.docs[0].data() };
+    }
+    document.getElementById('topbarName').textContent = userProfile.nome || email;
+  } catch(e) { console.error('loadUserProfile:', e); }
+}
+
+async function login() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  document.getElementById('loginError').textContent = '';
+  if (!email||!pass) { document.getElementById('loginError').textContent = 'Preencha e-mail e senha.'; return; }
+  try { await auth.signInWithEmailAndPassword(email, pass); }
+  catch(e) { document.getElementById('loginError').textContent = 'E-mail ou senha incorretos.'; }
+}
+
+async function esqueciSenha() {
+  const email = document.getElementById('loginEmail').value.trim();
+  if (!email) { document.getElementById('loginError').textContent = 'Digite seu e-mail acima primeiro.'; return; }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    document.getElementById('loginError').style.color = '#15803d';
+    document.getElementById('loginError').textContent = 'E-mail de redefinição enviado!';
+  } catch(e) { document.getElementById('loginError').textContent = 'E-mail não encontrado.'; }
+}
+
+async function logout() { await auth.signOut(); }
+
+// ── Portal Nav ───────────────────────────────────────────────
+function buildPortalNav() {
+  const roles = userProfile?.roles || ['colaborador'];
+  const tabs = [
+    { id:'minhasferias',   label:'🏖 Minhas Férias',         show: true },
+    { id:'solicitar',      label:'📝 Solicitar Férias',       show: true },
+    { id:'minhassolics',   label:'📋 Minhas Solicitações',    show: true },
+    { id:'aprovacoes',     label:'✅ Aprovar (Líder)',        show: roles.includes('lider') },
+    { id:'aprovacoes-rh',  label:'✅ Aprovar (RH)',           show: roles.includes('rh') },
+  ];
+  document.getElementById('portalNav').innerHTML = tabs.filter(t=>t.show).map(t =>
+    `<button class="portal-tab${t.id==='minhasferias'?' active':''}" id="ptab-${t.id}" onclick="showPortalSection('${t.id}',this)">${t.label}</button>`
+  ).join('');
+}
+
+function showPortalSection(id, btn) {
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.portal-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-'+id)?.classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id==='aprovacoes')    renderAprovacoes();
+  if (id==='aprovacoes-rh') renderAprovacoesRH();
+}
+
+// ── Load Data ────────────────────────────────────────────────
+async function loadPortalData() {
+  try {
+    const [snapP, snapS] = await Promise.all([
+      db.collection('ferias_periodos').where('colaborador_email','==',currentUser.email).get(),
+      db.collection('ferias_solicitacoes').orderBy('criado_em','desc').get(),
+    ]);
+    myPeriodos   = snapP.docs.map(d=>({id:d.id,...d.data()}));
+    allSolicitas = snapS.docs.map(d=>({id:d.id,...d.data()}));
+    renderKpis();
+    renderMeusPeriodos();
+    renderMinhasSolics();
+    populateSReqPeriodo();
+  } catch(e) { console.error('loadPortalData:', e); }
+}
+
+function renderKpis() {
+  const mySolics = allSolicitas.filter(s=>s.colaborador_email===currentUser.email);
+  const totalDireito  = myPeriodos.reduce((a,p)=>a+(p.dias_direito||30),0);
+  const totalGozados  = mySolics.filter(s=>s.status==='aprovado_rh').reduce((a,s)=>a+(s.dias||0),0);
+  const totalAgend    = mySolics.filter(s=>s.status==='pendente'||s.status==='aprovado_lider').reduce((a,s)=>a+(s.dias||0),0);
+  const saldo = totalDireito - totalGozados - totalAgend;
+  document.getElementById('pKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">Dias de Direito</div><div class="kpi-val">${totalDireito}</div><div class="kpi-sub">períodos ativos</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Dias Gozados</div><div class="kpi-val" style="color:#10b981">${totalGozados}</div><div class="kpi-sub">aprovados pelo RH</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Agendado/Pendente</div><div class="kpi-val" style="color:#1a8fe3">${totalAgend}</div><div class="kpi-sub">em aprovação</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Saldo Disponível</div><div class="kpi-val" style="color:${saldo<0?'#b91c1c':'#071e34'}">${saldo}</div><div class="kpi-sub">dias restantes</div></div>`;
+}
+
+function _fmtDate(str) {
+  if (!str) return '—';
+  return new Date(str+'T12:00:00').toLocaleDateString('pt-BR');
+}
+
+function _calcSaldo(p) {
+  const mySolics = allSolicitas.filter(s=>s.periodo_id===p.id);
+  const gozados   = mySolics.filter(s=>s.status==='aprovado_rh').reduce((a,s)=>a+(s.dias||0),0);
+  const agendados = mySolics.filter(s=>s.status==='pendente'||s.status==='aprovado_lider').reduce((a,s)=>a+(s.dias||0),0);
+  return { gozados, agendados, saldo:(p.dias_direito||30)-gozados-agendados };
+}
+
+function _badgeVence(dataLimite, saldo) {
+  if (!dataLimite||saldo<=0) return '';
+  const d = Math.round((new Date(dataLimite+'T12:00:00')-new Date())/86400000);
+  if (d<0)   return `<span class="vence-critico">VENCIDO</span>`;
+  if (d<=30) return `<span class="vence-critico">Vence em ${d}d</span>`;
+  if (d<=60) return `<span class="vence-atencao">Vence em ${d}d</span>`;
+  return `<span class="vence-ok">${d}d restantes</span>`;
+}
+
+function renderMeusPeriodos() {
+  const wrap = document.getElementById('pPeriodosWrap');
+  if (!myPeriodos.length) { wrap.innerHTML=`<div class="empty-state">Nenhum período aquisitivo cadastrado.<br><small>Entre em contato com o RH.</small></div>`; return; }
+  wrap.innerHTML = `<table class="table">
+    <thead><tr><th>Período Aquisitivo</th><th>Data Limite</th><th>Direito</th><th>Gozado</th><th>Agendado</th><th>Saldo</th><th>Prazo</th></tr></thead>
+    <tbody>${myPeriodos.map(p=>{
+      const {gozados,agendados,saldo}=_calcSaldo(p);
+      return `<tr>
+        <td style="font-size:12px">${_fmtDate(p.periodo_inicio)} – ${_fmtDate(p.periodo_fim)}</td>
+        <td style="font-size:12px">${_fmtDate(p.data_limite)}</td>
+        <td style="text-align:center"><strong>${p.dias_direito||30}</strong></td>
+        <td style="text-align:center;color:#10b981">${gozados}</td>
+        <td style="text-align:center;color:#1a8fe3">${agendados}</td>
+        <td style="text-align:center"><strong style="color:${saldo<0?'#b91c1c':'#071e34'}">${saldo}</strong></td>
+        <td>${_badgeVence(p.data_limite,saldo)}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+function renderMinhasSolics() {
+  const wrap = document.getElementById('pSolicsWrap');
+  const mine = allSolicitas.filter(s=>s.colaborador_email===currentUser.email);
+  const sLabel = { pendente:'Aguard. Líder', aprovado_lider:'Aguard. RH', aprovado_rh:'Aprovada', reprovado_lider:'Reprovada (Líder)', reprovado_rh:'Reprovada (RH)' };
+  const sClass = { pendente:'badge-pending', aprovado_lider:'badge-aprvlider', aprovado_rh:'badge-green', reprovado_lider:'badge-reprov', reprovado_rh:'badge-reprov' };
+  if (!mine.length) { wrap.innerHTML=`<div class="empty-state">Nenhuma solicitação enviada ainda.</div>`; return; }
+  wrap.innerHTML = `<table class="table">
+    <thead><tr><th>Período Solicitado</th><th>Dias</th><th>Tipo</th><th>Status</th><th>Solicitado em</th><th>Obs. Líder</th><th>Obs. RH</th></tr></thead>
+    <tbody>${mine.map(s=>{
+      const dt = s.criado_em?.toDate?s.criado_em.toDate().toLocaleDateString('pt-BR'):'—';
+      return `<tr>
+        <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
+        <td style="text-align:center"><strong>${s.dias}</strong></td>
+        <td><span class="badge badge-blue">${s.tipo==='abono'?'Abono':'Férias'}</span></td>
+        <td><span class="badge ${sClass[s.status]||'badge-blue'}">${sLabel[s.status]||s.status}</span></td>
+        <td style="font-size:11px;color:#94a3b8">${dt}</td>
+        <td style="font-size:12px;color:#64748b">${s.obs_lider||'—'}</td>
+        <td style="font-size:12px;color:#64748b">${s.obs_rh||'—'}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+function populateSReqPeriodo() {
+  const sel = document.getElementById('sReqPeriodo');
+  const available = myPeriodos.filter(p => _calcSaldo(p).saldo > 0);
+  sel.innerHTML = '<option value="">Selecione o período...</option>' +
+    available.map(p=>`<option value="${p.id}">${_fmtDate(p.periodo_inicio)} – ${_fmtDate(p.periodo_fim)} (${_calcSaldo(p).saldo} dias disponíveis)</option>`).join('');
+}
+
+function onSReqPeriodoChange() {
+  const id = document.getElementById('sReqPeriodo').value;
+  const p  = myPeriodos.find(x=>x.id===id);
+  const lbl = document.getElementById('sReqDiasLbl');
+  if (p) { const {saldo}=_calcSaldo(p); lbl.textContent=`Dias disponíveis: ${saldo}`; }
+  else lbl.textContent = 'Dias disponíveis: —';
+}
+
+function calcSReqDias() {
+  const ini = document.getElementById('sReqInicio').value;
+  const fim = document.getElementById('sReqFim').value;
+  const infoEl = document.getElementById('sReqDiasInfo');
+  const calcEl = document.getElementById('sReqDiasCalc');
+  if (!ini||!fim) { infoEl.style.display='none'; return; }
+  const dias = Math.round((new Date(fim+'T12:00:00')-new Date(ini+'T12:00:00'))/86400000)+1;
+  if (dias<=0) { infoEl.style.display='none'; return; }
+  const id = document.getElementById('sReqPeriodo').value;
+  const p  = myPeriodos.find(x=>x.id===id);
+  const saldo = p?_calcSaldo(p).saldo:null;
+  calcEl.textContent = `${dias} dias selecionados${saldo!==null?` · Saldo: ${saldo} dias`:''}${saldo!==null&&dias>saldo?' ⚠ Excede o saldo disponível':''}`;
+  infoEl.style.display = 'block';
+}
+
+async function enviarSolicitacao() {
+  const periodoId = document.getElementById('sReqPeriodo').value;
+  const tipo      = document.getElementById('sReqTipo').value;
+  const inicio    = document.getElementById('sReqInicio').value;
+  const fim       = document.getElementById('sReqFim').value;
+  const obs       = document.getElementById('sReqObs').value.trim();
+  if (!periodoId||!inicio||!fim) { toast('Preencha todos os campos obrigatórios','e'); return; }
+  const dias = Math.round((new Date(fim+'T12:00:00')-new Date(inicio+'T12:00:00'))/86400000)+1;
+  if (dias<=0) { toast('Data de fim deve ser após a data de início','e'); return; }
+  const p = myPeriodos.find(x=>x.id===periodoId);
+  if (!p) { toast('Período não encontrado','e'); return; }
+  const {saldo} = _calcSaldo(p);
+  if (dias > saldo) { toast(`Saldo insuficiente. Você tem ${saldo} dias disponíveis`,'e'); return; }
+
+  const data = {
+    colaborador_uid:   currentUser.uid,
+    colaborador_nome:  userProfile.nome,
+    colaborador_email: currentUser.email,
+    lider_nome:        userProfile.lider_nome||'',
+    lider_email:       userProfile.lider_email||'',
+    periodo_id:        periodoId,
+    data_inicio:       inicio,
+    data_fim:          fim,
+    dias,
+    tipo,
+    obs_colaborador:   obs,
+    obs_lider:         '',
+    obs_rh:            '',
+    status:            'pendente',
+    criado_em:         firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  try {
+    const ref = await db.collection('ferias_solicitacoes').add(data);
+    allSolicitas.unshift({id:ref.id,...data});
+    renderMinhasSolics(); populateSReqPeriodo(); renderKpis();
+    document.getElementById('sReqPeriodo').value = '';
+    document.getElementById('sReqInicio').value  = '';
+    document.getElementById('sReqFim').value     = '';
+    document.getElementById('sReqObs').value     = '';
+    document.getElementById('sReqDiasInfo').style.display='none';
+    toast('Solicitação enviada! Seu líder será notificado.');
+    // Notifica líder por e-mail
+    enviarEmail('pendente', {id:ref.id,...data});
+    // Muda para aba de solicitações
+    const tab = document.getElementById('ptab-minhassolics');
+    if(tab) showPortalSection('minhassolics', tab);
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+// ── Aprovações (Líder) ───────────────────────────────────────
+function renderAprovacoes() {
+  const wrap = document.getElementById('pAprovWrap');
+  // Filtra solicitações de colaboradores cujo líder_email == currentUser.email
+  const pendentes = allSolicitas.filter(s => s.lider_email===currentUser.email && s.status==='pendente');
+  if (!pendentes.length) { wrap.innerHTML=`<div class="empty-state">Nenhuma solicitação aguardando sua aprovação.</div>`; return; }
+  wrap.innerHTML = _renderSolicTable(pendentes, 'lider');
+}
+
+// ── Aprovações (RH) ──────────────────────────────────────────
+function renderAprovacoesRH() {
+  const wrap = document.getElementById('pAprovRhWrap');
+  const pendentes = allSolicitas.filter(s => s.status==='aprovado_lider');
+  if (!pendentes.length) { wrap.innerHTML=`<div class="empty-state">Nenhuma solicitação aguardando aprovação do RH.</div>`; return; }
+  wrap.innerHTML = _renderSolicTable(pendentes, 'rh');
+}
+
+function _renderSolicTable(list, step) {
+  return `<table class="table">
+    <thead><tr><th>Colaborador</th><th>Período Solicitado</th><th>Dias</th><th>Tipo</th><th>Obs. Colaborador</th><th></th></tr></thead>
+    <tbody>${list.map(s=>`<tr>
+      <td><strong style="color:#1a2535">${s.colaborador_nome}</strong></td>
+      <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
+      <td style="text-align:center"><strong>${s.dias}</strong></td>
+      <td><span class="badge badge-blue">${s.tipo==='abono'?'Abono':'Férias'}</span></td>
+      <td style="font-size:12px;color:#64748b">${s.obs_colaborador||'—'}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="openPSolicModal('${s.id}','${step}')">Analisar</button></td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+function openPSolicModal(id, step) {
+  const s = allSolicitas.find(x=>x.id===id); if(!s) return;
+  document.getElementById('pSolicId').value   = id;
+  document.getElementById('pSolicStep').value = step;
+  document.getElementById('pSolicInfo').innerHTML = `
+    <div style="background:#f8fafc;border-radius:10px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Colaborador</div><strong>${s.colaborador_nome}</strong></div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Período</div>${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong> (${s.tipo==='abono'?'Abono':'Férias'})</div>
+      ${s.obs_colaborador?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Obs.</div>${s.obs_colaborador}</div>`:''}
+    </div>`;
+  document.getElementById('pSolicObs').value = '';
+  const aprovLabel = step==='lider' ? 'Aprovar' : 'Aprovar (RH)';
+  document.getElementById('pSolicActions').innerHTML = `
+    <button class="btn btn-outline" onclick="closePSolicModal()">Fechar</button>
+    <button class="btn btn-danger"  onclick="pReprovar('${id}','${step}')">Reprovar</button>
+    <button class="btn btn-primary" onclick="pAprovar('${id}','${step}')">${aprovLabel}</button>`;
+  document.getElementById('pSolicModal').classList.add('open');
+}
+function closePSolicModal() { document.getElementById('pSolicModal').classList.remove('open'); }
+
+async function pAprovar(id, step) {
+  const obs = document.getElementById('pSolicObs').value.trim();
+  const newStatus = step==='lider' ? 'aprovado_lider' : 'aprovado_rh';
+  const upd = {status:newStatus};
+  if (step==='lider') { upd.obs_lider=obs; upd.aprovado_lider_em=firebase.firestore.FieldValue.serverTimestamp(); }
+  else { upd.obs_rh=obs; upd.aprovado_rh_em=firebase.firestore.FieldValue.serverTimestamp(); }
+  try {
+    await db.collection('ferias_solicitacoes').doc(id).update(upd);
+    const s = allSolicitas.find(x=>x.id===id); if(s) Object.assign(s,upd);
+    closePSolicModal();
+    if (step==='lider') renderAprovacoes(); else renderAprovacoesRH();
+    toast(step==='lider'?'Aprovado! RH será notificado.':'Férias aprovadas!');
+    enviarEmail(newStatus, allSolicitas.find(x=>x.id===id));
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+async function pReprovar(id, step) {
+  if (!confirm('Reprovar esta solicitação?')) return;
+  const obs = document.getElementById('pSolicObs').value.trim();
+  const newStatus = step==='lider' ? 'reprovado_lider' : 'reprovado_rh';
+  const upd = {status:newStatus};
+  if (step==='lider') upd.obs_lider=obs; else upd.obs_rh=obs;
+  try {
+    await db.collection('ferias_solicitacoes').doc(id).update(upd);
+    const s = allSolicitas.find(x=>x.id===id); if(s) Object.assign(s,upd);
+    closePSolicModal();
+    if (step==='lider') renderAprovacoes(); else renderAprovacoesRH();
+    toast('Solicitação reprovada.','e');
+    enviarEmail(newStatus, allSolicitas.find(x=>x.id===id));
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+// ── EmailJS ──────────────────────────────────────────────────
+function enviarEmail(tipo, solic) {
+  if (typeof emailjs==='undefined'||EMAILJS_SERVICE_ID==='SERVICE_ID_AQUI') {
+    console.log('[EmailJS] Aguardando configuração. Evento:', tipo); return;
+  }
+  const params = {
+    colaborador_nome: solic?.colaborador_nome,
+    data_inicio:      _fmtDate(solic?.data_inicio),
+    data_fim:         _fmtDate(solic?.data_fim),
+    dias:             solic?.dias,
+    obs_colaborador:  solic?.obs_colaborador||'',
+    obs_lider:        solic?.obs_lider||'',
+    obs_rh:           solic?.obs_rh||'',
+    portal_url:       window.location.href,
+  };
+  if (tipo==='pendente')
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_LIDER,  {...params, to_email:solic?.lider_email});
+  else if (tipo==='aprovado_lider')
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_RH,     {...params, to_email:'danielle.felipe@ecgnow.com.br'});
+  else
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_RESULT, {...params, to_email:solic?.colaborador_email, status:tipo});
+}
+
+// ── Toast ────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, type='s') {
+  const el = document.getElementById('toast');
+  el.textContent=msg; el.className='show-'+type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.className='', 3500);
+}
+</script>
+</body>
+</html>
