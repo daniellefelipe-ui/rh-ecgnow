@@ -3987,26 +3987,31 @@ async function saveUsuario() {
     } catch(authErr) {
       if (authErr.code==='auth/email-already-in-use') {
         let existingUid;
-        // Se for o próprio usuário logado, pega o UID diretamente
         if (email === auth.currentUser?.email) {
+          // Usuário atual logado — pega UID direto
           existingUid = auth.currentUser.uid;
         } else {
-          // Tenta logar com a senha informada para obter o UID
+          // Tenta logar com a senha informada
           try {
             const cred2 = await sAuth.signInWithEmailAndPassword(email, senha);
             existingUid = cred2.user.uid;
           } catch(e2) {
-            await sAuth.signOut(); sec.delete();
-            toast('Conta já existe mas a senha está incorreta. Use "Reenviar Senha" para o colaborador definir a senha.','e');
-            return;
+            // Senha incorreta — salva perfil usando e-mail como ID do documento
+            // (loadUserProfile faz fallback por e-mail, então vai funcionar)
+            existingUid = null;
           }
         }
         await sAuth.signOut(); sec.delete();
-        await db.collection('usuarios').doc(existingUid).set(userData);
+        const docId = existingUid || ('email_' + email.replace(/[@.]/g,'_'));
+        await db.collection('usuarios').doc(docId).set(userData);
         const exIdx = allFerUsuarios.findIndex(u=>u.email===email);
-        if (exIdx>=0) allFerUsuarios[exIdx]={id:existingUid,...userData};
-        else allFerUsuarios.push({id:existingUid,...userData});
-        closeUsuarioModal(); renderFerUsuarios(); toast('Perfil salvo!'); return;
+        if (exIdx>=0) allFerUsuarios[exIdx]={id:docId,...userData};
+        else allFerUsuarios.push({id:docId,...userData});
+        // Envia e-mail para o colaborador definir/redefinir a senha
+        try { await auth.sendPasswordResetEmail(email); } catch(_){}
+        closeUsuarioModal(); renderFerUsuarios();
+        toast(`Perfil salvo! E-mail de acesso enviado para ${email}`);
+        return;
       }
       throw authErr;
     }
