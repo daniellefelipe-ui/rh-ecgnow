@@ -237,6 +237,19 @@
         <div id="pAprovRhWrap"><div class="empty-state">Carregando...</div></div>
       </div>
     </section>
+
+    <section class="page-section" id="sec-equipe">
+      <div class="kpi-grid" id="pEquipeKpis"></div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" id="pEquipeTitle">Férias da Equipe</span>
+          <select class="form-select" id="pEquipeFiltro" onchange="renderEquipe()" style="width:180px">
+            <option value="">Todos os colaboradores</option>
+          </select>
+        </div>
+        <div id="pEquipeWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -346,6 +359,7 @@ function buildPortalNav() {
     { id:'minhassolics',   label:'📋 Minhas Solicitações',    show: true },
     { id:'aprovacoes',     label:'✅ Aprovar (Líder)',        show: roles.includes('lider') },
     { id:'aprovacoes-rh',  label:'✅ Aprovar (RH)',           show: roles.includes('rh') },
+    { id:'equipe',         label:'👥 Equipe',                 show: roles.includes('lider') || roles.includes('rh') },
   ];
   document.getElementById('portalNav').innerHTML = tabs.filter(t=>t.show).map(t =>
     `<button class="portal-tab${t.id==='minhasferias'?' active':''}" id="ptab-${t.id}" onclick="showPortalSection('${t.id}',this)">${t.label}</button>`
@@ -359,17 +373,23 @@ function showPortalSection(id, btn) {
   if (btn) btn.classList.add('active');
   if (id==='aprovacoes')    renderAprovacoes();
   if (id==='aprovacoes-rh') renderAprovacoesRH();
+  if (id==='equipe')        renderEquipe();
 }
 
 // ── Load Data ────────────────────────────────────────────────
 async function loadPortalData() {
   try {
-    const [snapP, snapS] = await Promise.all([
+    const roles = userProfile?.roles || [];
+    const isLiderOrRh = roles.includes('lider') || roles.includes('rh');
+    const queries = [
       db.collection('ferias_periodos').where('colaborador_email','==',currentUser.email).get(),
       db.collection('ferias_solicitacoes').orderBy('criado_em','desc').get(),
-    ]);
-    myPeriodos   = snapP.docs.map(d=>({id:d.id,...d.data()}));
-    allSolicitas = snapS.docs.map(d=>({id:d.id,...d.data()}));
+    ];
+    if (isLiderOrRh) queries.push(db.collection('ferias_periodos').orderBy('colaborador_nome').get());
+    const results = await Promise.all(queries);
+    myPeriodos   = results[0].docs.map(d=>({id:d.id,...d.data()}));
+    allSolicitas = results[1].docs.map(d=>({id:d.id,...d.data()}));
+    if (isLiderOrRh) allPeriodos = results[2].docs.map(d=>({id:d.id,...d.data()}));
     renderKpis();
     renderMeusPeriodos();
     renderMinhasSolics();
@@ -529,6 +549,98 @@ async function enviarSolicitacao() {
     const tab = document.getElementById('ptab-minhassolics');
     if(tab) showPortalSection('minhassolics', tab);
   } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+// ── Equipe ───────────────────────────────────────────────────
+let allPeriodos = []; // todos os períodos (para líderes/RH)
+
+async function loadEquipePeriodos() {
+  const roles = userProfile?.roles || [];
+  if (!roles.includes('lider') && !roles.includes('rh')) return;
+  try {
+    let query = db.collection('ferias_periodos').orderBy('colaborador_nome');
+    const snap = await query.get();
+    allPeriodos = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e) { console.error('loadEquipePeriodos:', e); }
+}
+
+function _getEquipePeriodos() {
+  const roles = userProfile?.roles || [];
+  if (roles.includes('rh')) return allPeriodos; // RH vê todos
+  // Líder vê os seus + os dos seus liderados
+  const USUARIOS_PORTAL = [
+    { nome:'Marco Antonio Bustamante de Lima',  email:'marco.lima@ecgnow.com.br',    lider_email:'' },
+    { nome:'Barbara Braga Duarte de Souza',     email:'barbara.braga@ecgnow.com.br', lider_email:'marco.lima@ecgnow.com.br' },
+    { nome:'Damaris Alves Vieira de Sousa',     email:'damaris.alves@ecgnow.com.br', lider_email:'barbara.braga@ecgnow.com.br' },
+    { nome:'Danielle Felipe Pereira',           email:'danielle.felipe@ecgnow.com.br',lider_email:'marco.lima@ecgnow.com.br' },
+    { nome:'Mayara Luize Almeida Gomes Silva',  email:'mayara.silva@ecgnow.com.br',  lider_email:'marco.lima@ecgnow.com.br' },
+    { nome:'Raini Dias Soares da Costa',        email:'raini.dias@ecgnow.com.br',    lider_email:'barbara.braga@ecgnow.com.br' },
+  ];
+  const emailsEquipe = USUARIOS_PORTAL
+    .filter(u => u.email === currentUser.email || u.lider_email === currentUser.email)
+    .map(u => u.email);
+  return allPeriodos.filter(p => emailsEquipe.includes(p.colaborador_email));
+}
+
+function renderEquipe() {
+  const wrap   = document.getElementById('pEquipeWrap');
+  const kpis   = document.getElementById('pEquipeKpis');
+  const titulo = document.getElementById('pEquipeTitle');
+  const filtro = document.getElementById('pEquipeFiltro');
+  const roles  = userProfile?.roles || [];
+
+  titulo.textContent = roles.includes('rh') ? 'Férias de Todos os Colaboradores' : 'Férias da Equipe';
+
+  const periodos = _getEquipePeriodos();
+  if (!periodos.length) { wrap.innerHTML=`<div class="empty-state">Nenhum período cadastrado.</div>`; return; }
+
+  // Popula filtro de colaborador
+  const nomes = [...new Set(periodos.map(p=>p.colaborador_nome))].sort();
+  const filtroVal = filtro.value;
+  filtro.innerHTML = '<option value="">Todos os colaboradores</option>' +
+    nomes.map(n=>`<option value="${n}" ${n===filtroVal?'selected':''}>${n}</option>`).join('');
+
+  const lista = filtroVal ? periodos.filter(p=>p.colaborador_nome===filtroVal) : periodos;
+
+  // KPIs
+  const sLabel = {pendente:'Aguard. Líder',aprovado_lider:'Aguard. RH',aprovado_rh:'Aprovada',reprovado_lider:'Reprovada',reprovado_rh:'Reprovada'};
+  const sClass = {pendente:'badge-pending',aprovado_lider:'badge-aprvlider',aprovado_rh:'badge-green',reprovado_lider:'badge-reprov',reprovado_rh:'badge-reprov'};
+
+  const totalDireito = lista.reduce((a,p)=>a+(p.dias_direito||30),0);
+  const solicsEquipe = allSolicitas.filter(s => lista.some(p=>p.id===s.periodo_id));
+  const totalGozados = solicsEquipe.filter(s=>s.status==='aprovado_rh').reduce((a,s)=>a+(s.dias||0),0);
+  const pendentes    = solicsEquipe.filter(s=>s.status==='pendente'||s.status==='aprovado_lider').length;
+
+  kpis.innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">Períodos</div><div class="kpi-val">${lista.length}</div><div class="kpi-sub">${nomes.length} colaborador(es)</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Total de Dias</div><div class="kpi-val">${totalDireito}</div><div class="kpi-sub">dias de direito</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Dias Gozados</div><div class="kpi-val" style="color:#10b981">${totalGozados}</div><div class="kpi-sub">aprovados pelo RH</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Solicitações Pendentes</div><div class="kpi-val" style="color:${pendentes>0?'#b45309':'#071e34'}">${pendentes}</div><div class="kpi-sub">aguardando aprovação</div></div>`;
+
+  // Tabela
+  wrap.innerHTML = `<table class="table">
+    <thead><tr><th>Colaborador</th><th>Período Aquisitivo</th><th>Limite</th><th>Direito</th><th>Gozado</th><th>Agendado</th><th>Saldo</th><th>Prazo</th></tr></thead>
+    <tbody>${lista.map(p=>{
+      const gozados   = solicsEquipe.filter(s=>s.periodo_id===p.id&&s.status==='aprovado_rh').reduce((a,s)=>a+(s.dias||0),0);
+      const agendados = solicsEquipe.filter(s=>s.periodo_id===p.id&&(s.status==='pendente'||s.status==='aprovado_lider')).reduce((a,s)=>a+(s.dias||0),0);
+      const saldo = (p.dias_direito||30)-gozados-agendados;
+      const d = p.data_limite?Math.round((new Date(p.data_limite+'T12:00:00')-new Date())/86400000):null;
+      const alerta = !p.data_limite||saldo<=0?''
+        :d<0?`<span class="vence-critico">VENCIDO</span>`
+        :d<=30?`<span class="vence-critico">Vence em ${d}d</span>`
+        :d<=60?`<span class="vence-atencao">Vence em ${d}d</span>`
+        :`<span class="vence-ok">${d}d restantes</span>`;
+      return `<tr>
+        <td><strong style="color:#1a2535">${p.colaborador_nome.split(' ').slice(0,2).join(' ')}</strong><br><span style="font-size:11px;color:#94a3b8">${p.colaborador_email}</span></td>
+        <td style="font-size:12px">${_fmtDate(p.periodo_inicio)} – ${_fmtDate(p.periodo_fim)}</td>
+        <td style="font-size:12px">${_fmtDate(p.data_limite)}</td>
+        <td style="text-align:center"><strong>${p.dias_direito||30}</strong></td>
+        <td style="text-align:center;color:#10b981">${gozados}</td>
+        <td style="text-align:center;color:#1a8fe3">${agendados}</td>
+        <td style="text-align:center"><strong style="color:${saldo<0?'#b91c1c':'#071e34'}">${saldo}</strong></td>
+        <td>${alerta}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
 }
 
 // ── Aprovações (Líder) ───────────────────────────────────────
