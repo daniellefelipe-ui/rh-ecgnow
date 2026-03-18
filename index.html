@@ -3653,7 +3653,9 @@ function setFerTab(tab, btn) {
   if (active) { active.classList.remove('btn-outline'); active.classList.add('btn-primary'); }
   const actionsEl = document.getElementById('ferTabActions');
   if (tab === 'periodos') {
-    actionsEl.innerHTML = `<button class="btn btn-primary" onclick="openPeriodoModal()">+ Adicionar Período</button>`;
+    actionsEl.innerHTML = `
+      <button class="btn btn-outline" onclick="seedFeriasPDF()" style="font-size:11px">📄 Importar do PDF</button>
+      <button class="btn btn-primary" onclick="openPeriodoModal()">+ Adicionar Período</button>`;
     renderFerPeriodos();
   } else if (tab === 'solicitacoes') {
     actionsEl.innerHTML = '';
@@ -4014,6 +4016,38 @@ async function saveUsuario() {
     await auth.sendPasswordResetEmail(email);
     closeUsuarioModal(); renderFerUsuarios();
     toast(`Conta criada! E-mail de acesso enviado para ${email}`);
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+async function seedFeriasPDF() {
+  if (!confirm('Importar os períodos do PDF da ECGNow?\n\nSomente serão adicionados períodos que ainda não existem no sistema.')) return;
+  const periodosPDF = [
+    { colaborador_nome:'Danielle Felipe Pereira',          colaborador_email:'danielle.felipe@ecgnow.com.br', data_admissao:'2023-05-24', periodo_inicio:'2024-05-24', periodo_fim:'2025-05-23', data_limite:'2026-04-22', dias_direito:16, inicio_previsto:'' },
+    { colaborador_nome:'Danielle Felipe Pereira',          colaborador_email:'danielle.felipe@ecgnow.com.br', data_admissao:'2023-05-24', periodo_inicio:'2025-05-24', periodo_fim:'2026-05-23', data_limite:'2027-04-22', dias_direito:30, inicio_previsto:'' },
+    { colaborador_nome:'Raini Dias Soares da Costa',       colaborador_email:'raini.dias@ecgnow.com.br',      data_admissao:'2024-01-30', periodo_inicio:'2025-01-30', periodo_fim:'2026-01-29', data_limite:'2026-12-29', dias_direito:30, inicio_previsto:'' },
+    { colaborador_nome:'Barbara Braga Duarte de Souza',    colaborador_email:'barbara.braga@ecgnow.com.br',   data_admissao:'2022-05-11', periodo_inicio:'2025-05-11', periodo_fim:'2026-05-10', data_limite:'2027-04-09', dias_direito:30, inicio_previsto:'' },
+    { colaborador_nome:'Mayara Luize Almeida Gomes Silva', colaborador_email:'mayara.silva@ecgnow.com.br',    data_admissao:'2023-07-25', periodo_inicio:'2025-07-25', periodo_fim:'2026-07-24', data_limite:'2027-06-23', dias_direito:30, inicio_previsto:'' },
+    { colaborador_nome:'Damaris Alves Vieira de Sousa',    colaborador_email:'damaris.alves@ecgnow.com.br',   data_admissao:'2025-12-01', periodo_inicio:'2025-12-01', periodo_fim:'2026-11-30', data_limite:'2027-10-30', dias_direito:30, inicio_previsto:'' },
+  ];
+  let adicionados = 0, ignorados = 0;
+  try {
+    const batch = db.batch();
+    for (const p of periodosPDF) {
+      // Verifica se já existe um período igual (mesmo colaborador + periodo_inicio)
+      const existe = allFerPeriodos.find(x =>
+        _normNome(x.colaborador_nome) === _normNome(p.colaborador_nome) &&
+        x.periodo_inicio === p.periodo_inicio
+      );
+      if (existe) { ignorados++; continue; }
+      const ref = db.collection('ferias_periodos').doc();
+      batch.set(ref, p);
+      allFerPeriodos.push({ id: ref.id, ...p });
+      adicionados++;
+    }
+    await batch.commit();
+    buildFeriasKpis();
+    renderFerPeriodos();
+    toast(`${adicionados} período(s) importado(s)${ignorados ? ` · ${ignorados} já existia(m)` : ''}.`);
   } catch(e) { toast('Erro: '+e.message,'e'); }
 }
 
