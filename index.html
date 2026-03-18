@@ -3696,11 +3696,12 @@ function renderFerPeriodos() {
     return;
   }
   wrap.innerHTML = `<table class="table">
-    <thead><tr><th>Colaborador</th><th>Período Aquisitivo</th><th>Data Limite</th><th>Direito</th><th>Gozado</th><th>Agendado</th><th>Saldo</th><th>Prazo</th><th></th></tr></thead>
+    <thead><tr><th>Colaborador</th><th>Admissão</th><th>Período Aquisitivo</th><th>Data Limite</th><th>Direito</th><th>Gozado</th><th>Agendado</th><th>Saldo</th><th>Prazo</th><th></th></tr></thead>
     <tbody>${allFerPeriodos.map(p => {
       const {gozados,agendados,saldo} = _calcSaldo(p);
       return `<tr>
         <td><strong style="color:#1a2535">${p.colaborador_nome}</strong></td>
+        <td style="font-size:12px;color:#64748b">${_fmtDate(p.data_admissao)}</td>
         <td style="color:#64748b;font-size:12px">${_fmtDate(p.periodo_inicio)} – ${_fmtDate(p.periodo_fim)}</td>
         <td style="font-size:12px">${_fmtDate(p.data_limite)}</td>
         <td style="text-align:center"><strong>${p.dias_direito||30}</strong></td>
@@ -3709,6 +3710,7 @@ function renderFerPeriodos() {
         <td style="text-align:center"><strong style="color:${saldo<0?'#b91c1c':saldo===0?'#94a3b8':'#071e34'}">${saldo}</strong></td>
         <td>${_badgeVence(p.data_limite,saldo)}</td>
         <td style="white-space:nowrap">
+          <button class="btn btn-sm btn-outline" onclick="renovarPeriodo('${p.id}')" title="Criar próximo período aquisitivo" style="margin-right:4px">🔄 Renovar</button>
           <button class="btn btn-sm btn-outline" onclick="openPeriodoModal('${p.id}')">Editar</button>
           <button class="btn btn-sm btn-danger"  onclick="deletePeriodo('${p.id}')" style="margin-left:4px">Excluir</button>
         </td>
@@ -3874,6 +3876,45 @@ async function savePeriodo() {
     }
     closePeriodoModal(); buildFeriasKpis(); renderFerPeriodos(); toast('Período salvo!');
   } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+function renovarPeriodo(id) {
+  const p = allFerPeriodos.find(x => x.id === id);
+  if (!p) return;
+
+  // Novo período começa 1 dia após o fim do atual
+  const novoInicio = new Date(p.periodo_fim + 'T12:00:00');
+  novoInicio.setDate(novoInicio.getDate() + 1);
+  const novoFim = new Date(novoInicio);
+  novoFim.setFullYear(novoFim.getFullYear() + 1);
+  novoFim.setDate(novoFim.getDate() - 1);
+  const novoLimite = new Date(novoFim);
+  novoLimite.setFullYear(novoLimite.getFullYear() + 1);
+
+  const toISO = d => d.toISOString().split('T')[0];
+
+  // Verifica se já existe um período para esse colaborador a partir dessa data
+  const jaExiste = allFerPeriodos.find(x =>
+    _normNome(x.colaborador_nome) === _normNome(p.colaborador_nome) &&
+    x.periodo_inicio === toISO(novoInicio)
+  );
+  if (jaExiste) { toast('Já existe um período aquisitivo cadastrado a partir dessa data.', 'e'); return; }
+
+  // Abre o modal pré-preenchido com os novos valores
+  const sel = document.getElementById('periodoColab');
+  sel.innerHTML = '<option value="">Selecione...</option>' +
+    USUARIOS_PORTAL.map(u => `<option value="${u.nome}" data-email="${u.email}">${u.nome}</option>`).join('');
+
+  document.getElementById('periodoModalTitle').textContent  = 'Renovar Período Aquisitivo';
+  document.getElementById('periodoId').value                = '';
+  document.getElementById('periodoColab').value             = p.colaborador_nome;
+  document.getElementById('periodoAdmissao').value          = p.data_admissao || '';
+  document.getElementById('periodoDias').value              = 30;
+  document.getElementById('periodoInicio').value            = toISO(novoInicio);
+  document.getElementById('periodoFim').value               = toISO(novoFim);
+  document.getElementById('periodoLimite').value            = toISO(novoLimite);
+  document.getElementById('periodoInicioGozo').value        = '';
+  document.getElementById('periodoModal').classList.add('open');
 }
 
 async function deletePeriodo(id) {
