@@ -139,12 +139,12 @@
       <input type="email" id="loginEmail" placeholder="seu@ecgnow.com.br" onkeydown="if(event.key==='Enter')login()">
     </div>
     <div class="login-field">
-      <label>Senha</label>
-      <input type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+      <label>PIN de Acesso</label>
+      <input type="password" id="loginPassword" placeholder="Digite seu PIN" onkeydown="if(event.key==='Enter')login()">
     </div>
     <button class="login-btn" onclick="login()">Entrar</button>
     <p class="login-error" id="loginError"></p>
-    <div class="login-forgot"><a onclick="esqueciSenha()">Esqueci minha senha</a></div>
+    <div class="login-forgot"><a onclick="esqueciSenha()">Esqueci meu PIN</a></div>
   </div>
 </div>
 
@@ -300,56 +300,55 @@ let userProfile = null;   // from 'usuarios' collection
 let myPeriodos  = [];
 let allSolicitas= [];
 
-// ── Auth ─────────────────────────────────────────────────────
-auth.onAuthStateChanged(async user => {
-  if (user) {
-    currentUser = user;
-    await loadUserProfile(user.uid, user.email);
-    document.getElementById('loginPage').style.display = 'none';
-    document.getElementById('appPage').style.display   = 'flex';
-    buildPortalNav();
-    await loadPortalData();
-  } else {
+// ── Auth (PIN) ────────────────────────────────────────────────
+function _initSession(user) {
+  currentUser = { email: user.email, uid: user.id };
+  userProfile  = user;
+  document.getElementById('topbarName').textContent = user.nome || user.email;
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('appPage').style.display   = 'flex';
+  buildPortalNav();
+  loadPortalData();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const stored = sessionStorage.getItem('portalUser');
+  if (stored) { _initSession(JSON.parse(stored)); }
+  else {
     document.getElementById('loginPage').style.display = 'flex';
     document.getElementById('appPage').style.display   = 'none';
   }
 });
 
-async function loadUserProfile(uid, email) {
-  try {
-    const doc = await db.collection('usuarios').doc(uid).get();
-    if (doc.exists) {
-      userProfile = { id: uid, ...doc.data() };
-    } else {
-      // Fallback: tenta buscar por email
-      const snap = await db.collection('usuarios').where('email','==',email).limit(1).get();
-      userProfile = snap.empty ? { id:uid, nome:email, email, roles:['colaborador'], lider_email:'', lider_nome:'' }
-                               : { id:snap.docs[0].id, ...snap.docs[0].data() };
-    }
-    document.getElementById('topbarName').textContent = userProfile.nome || email;
-  } catch(e) { console.error('loadUserProfile:', e); }
-}
-
 async function login() {
-  const email = document.getElementById('loginEmail').value.trim();
-  const pass  = document.getElementById('loginPassword').value;
-  document.getElementById('loginError').textContent = '';
-  if (!email||!pass) { document.getElementById('loginError').textContent = 'Preencha e-mail e senha.'; return; }
-  try { await auth.signInWithEmailAndPassword(email, pass); }
-  catch(e) { document.getElementById('loginError').textContent = 'E-mail ou senha incorretos.'; }
-}
-
-async function esqueciSenha() {
-  const email = document.getElementById('loginEmail').value.trim();
-  if (!email) { document.getElementById('loginError').textContent = 'Digite seu e-mail acima primeiro.'; return; }
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pin   = document.getElementById('loginPassword').value.trim();
+  const errEl = document.getElementById('loginError');
+  errEl.style.color = '#dc2626'; errEl.textContent = '';
+  if (!email || !pin) { errEl.textContent = 'Preencha e-mail e PIN.'; return; }
   try {
-    await auth.sendPasswordResetEmail(email);
-    document.getElementById('loginError').style.color = '#15803d';
-    document.getElementById('loginError').textContent = 'E-mail de redefinição enviado!';
-  } catch(e) { document.getElementById('loginError').textContent = 'E-mail não encontrado.'; }
+    const snap = await db.collection('usuarios').where('email','==',email).limit(1).get();
+    if (snap.empty || snap.docs[0].data().pin !== pin) {
+      errEl.textContent = 'E-mail ou PIN incorretos.'; return;
+    }
+    const user = { id: snap.docs[0].id, ...snap.docs[0].data() };
+    sessionStorage.setItem('portalUser', JSON.stringify(user));
+    _initSession(user);
+  } catch(e) { errEl.textContent = 'Erro ao conectar. Tente novamente.'; }
 }
 
-async function logout() { await auth.signOut(); }
+function esqueciSenha() {
+  const errEl = document.getElementById('loginError');
+  errEl.style.color = '#1a8fe3';
+  errEl.textContent = 'Entre em contato com o RH para redefinir seu PIN.';
+}
+
+function logout() {
+  sessionStorage.removeItem('portalUser');
+  currentUser = null; userProfile = null;
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('appPage').style.display   = 'none';
+}
 
 // ── Portal Nav ───────────────────────────────────────────────
 function buildPortalNav() {
