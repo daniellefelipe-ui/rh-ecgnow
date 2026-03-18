@@ -3732,7 +3732,7 @@ function renderFerSolicitacoes() {
         <td><strong style="color:#1a2535">${s.colaborador_nome}</strong></td>
         <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
         <td style="text-align:center"><strong>${s.dias}</strong></td>
-        <td><span class="badge ${s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
+        <td><span class="badge ${s.tipo==='ferias_e_abono'?'badge-orange':s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='ferias_e_abono'?'Férias + Abono':s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
         <td><span class="badge ${statusClass[s.status]||'badge-blue'}">${statusLabel[s.status]||s.status}</span></td>
         <td style="font-size:11px;color:#94a3b8">${dt}</td>
         <td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${obs}">${obs||'—'}</td>
@@ -3936,7 +3936,7 @@ function openSolicModal(id, step) {
     <div style="background:#f8fafc;border-radius:10px;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Colaborador</div><strong>${s.colaborador_nome}</strong></div>
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Período</div>${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</div>
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong> (${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'})</div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong>${s.tipo==='ferias_e_abono'?` (${s.dias_ferias||s.dias-10} dias de férias + 10 dias abono)`:s.tipo==='abono_pecuniario'?' (Abono Pecuniário)':s.tipo==='abono'?' (Abono)':' (Férias)'}</div>
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Status</div>${stepLabel[s.status]||s.status}</div>
       ${s.obs_colaborador?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Obs. Colaborador</div><div style="color:#64748b">${s.obs_colaborador}</div></div>`:''}
       ${s.obs_lider?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Obs. Líder</div><div style="color:#64748b">${s.obs_lider}</div></div>`:''}
