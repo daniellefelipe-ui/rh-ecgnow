@@ -503,26 +503,47 @@ function onSReqPeriodoChange() {
   const p    = myPeriodos.find(x=>x.id===id);
   const lbl  = document.getElementById('sReqDiasLbl');
   const tipo = document.getElementById('sReqTipo').value;
+
+  // Limpa datas ao trocar período
+  document.getElementById('sReqInicio').value = '';
+  document.getElementById('sReqFim').value    = '';
+  document.getElementById('sReqDiasInfo').style.display = 'none';
+
   if (p) {
     const {saldo} = _calcSaldo(p);
-    lbl.textContent = `Dias disponíveis: ${saldo}`;
-    if (tipo === 'abono_pecuniario') {
+
+    // Data mínima para início das férias = dia seguinte ao fim do período aquisitivo
+    const minDate = new Date(p.periodo_fim + 'T12:00:00');
+    minDate.setDate(minDate.getDate() + 1);
+    const minDateStr = minDate.toISOString().split('T')[0];
+
+    if (tipo === 'ferias') {
+      lbl.textContent = `Dias disponíveis: ${saldo} · Férias a partir de: ${_fmtDate(minDateStr)}`;
+      // Define data mínima nos campos de data
+      document.getElementById('sReqInicio').min = minDateStr;
+      document.getElementById('sReqFim').min    = minDateStr;
+    } else if (tipo === 'abono_pecuniario') {
+      lbl.textContent = `Dias disponíveis: ${saldo}`;
       const infoEl = document.getElementById('sReqDiasInfo');
       const calcEl = document.getElementById('sReqDiasCalc');
+      const infoDiv = infoEl.querySelector('div');
       if (saldo >= 10) {
+        infoDiv.style.background    = '#f0f9ff';
+        infoDiv.style.borderColor   = '#bae6fd';
+        infoDiv.style.color         = '#0369a1';
         calcEl.textContent = `10 dias serão deduzidos do seu saldo. Saldo restante após aprovação: ${saldo - 10} dias.`;
-        infoEl.style.display = 'block';
       } else {
+        infoDiv.style.background    = '#fef2f2';
+        infoDiv.style.borderColor   = '#fecaca';
+        infoDiv.style.color         = '#b91c1c';
         calcEl.textContent = `Saldo insuficiente. Você precisa de pelo menos 10 dias disponíveis para solicitar o abono pecuniário.`;
-        infoEl.style.background = '#fef2f2';
-        infoEl.querySelector('div').style.background = '#fef2f2';
-        infoEl.querySelector('div').style.borderColor = '#fecaca';
-        infoEl.querySelector('div').style.color = '#b91c1c';
-        infoEl.style.display = 'block';
       }
+      infoEl.style.display = 'block';
     }
   } else {
     lbl.textContent = 'Dias disponíveis: —';
+    document.getElementById('sReqInicio').removeAttribute('min');
+    document.getElementById('sReqFim').removeAttribute('min');
   }
 }
 
@@ -566,6 +587,13 @@ async function enviarSolicitacao() {
     dias = Math.round((new Date(fim+'T12:00:00')-new Date(inicio+'T12:00:00'))/86400000)+1;
     if (dias<=0) { toast('Data de fim deve ser após a data de início','e'); return; }
     if (dias > saldo) { toast(`Saldo insuficiente. Você tem ${saldo} dias disponíveis`,'e'); return; }
+    // Valida que as férias começam após o período aquisitivo
+    const minDate = new Date(p.periodo_fim+'T12:00:00');
+    minDate.setDate(minDate.getDate()+1);
+    if (new Date(inicio+'T12:00:00') < minDate) {
+      toast(`As férias só podem ser iniciadas a partir de ${minDate.toLocaleDateString('pt-BR')} (após o fim do período aquisitivo).`, 'e');
+      return;
+    }
   }
 
   const data = {
