@@ -180,13 +180,6 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Tipo *</label>
-            <select class="form-select" id="sReqTipo" onchange="onSReqTipoChange()">
-              <option value="ferias">Férias</option>
-              <option value="abono_pecuniario">Abono Pecuniário (venda de 10 dias)</option>
-            </select>
-          </div>
-          <div class="form-group">
             <label class="form-label" id="sReqDiasLbl">Dias disponíveis: —</label>
           </div>
           <div id="sReqDatasWrap">
@@ -201,11 +194,13 @@
               </div>
             </div>
           </div>
-          <div id="sReqAbonoInfo" style="display:none;grid-column:1/-1">
-            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px;font-size:13px;color:#92400e">
-              <strong>Abono Pecuniário</strong> — Você está solicitando a venda de <strong>10 dias</strong> de férias.<br>
-              Esses 10 dias serão deduzidos do seu saldo e você receberá o valor correspondente em folha.
-            </div>
+          <div class="form-group full">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
+              <input type="checkbox" id="sReqAbono" onchange="calcSReqDias()" style="width:16px;height:16px;accent-color:#b45309;flex-shrink:0">
+              <span style="font-size:13px;color:#92400e">
+                <strong>Incluir Abono Pecuniário</strong> — venda de 10 dias adicionais (serão descontados do saldo junto com os dias de férias)
+              </span>
+            </label>
           </div>
           <div class="form-group full">
             <label class="form-label">Observação</label>
@@ -469,7 +464,7 @@ function renderMinhasSolics() {
       return `<tr>
         <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
         <td style="text-align:center"><strong>${s.dias}</strong></td>
-        <td><span class="badge ${s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
+        <td><span class="badge ${s.tipo==='ferias_e_abono'?'badge-orange':s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='ferias_e_abono'?'Férias + Abono':s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
         <td><span class="badge ${sClass[s.status]||'badge-blue'}">${sLabel[s.status]||s.status}</span></td>
         <td style="font-size:11px;color:#94a3b8">${dt}</td>
         <td style="font-size:12px;color:#64748b">${s.obs_lider||'—'}</td>
@@ -485,61 +480,23 @@ function populateSReqPeriodo() {
     available.map(p=>`<option value="${p.id}">${_fmtDate(p.periodo_inicio)} – ${_fmtDate(p.periodo_fim)} (${_calcSaldo(p).saldo} dias disponíveis)</option>`).join('');
 }
 
-function onSReqTipoChange() {
-  const tipo = document.getElementById('sReqTipo').value;
-  const isAbono = tipo === 'abono_pecuniario';
-  document.getElementById('sReqDatasWrap').style.display  = isAbono ? 'none' : 'block';
-  document.getElementById('sReqAbonoInfo').style.display  = isAbono ? 'block' : 'none';
-  document.getElementById('sReqDiasInfo').style.display   = 'none';
-  if (isAbono) {
-    document.getElementById('sReqInicio').value = '';
-    document.getElementById('sReqFim').value    = '';
-  }
-  onSReqPeriodoChange();
-}
 
 function onSReqPeriodoChange() {
-  const id   = document.getElementById('sReqPeriodo').value;
-  const p    = myPeriodos.find(x=>x.id===id);
-  const lbl  = document.getElementById('sReqDiasLbl');
-  const tipo = document.getElementById('sReqTipo').value;
-
-  // Limpa datas ao trocar período
+  const id  = document.getElementById('sReqPeriodo').value;
+  const p   = myPeriodos.find(x=>x.id===id);
+  const lbl = document.getElementById('sReqDiasLbl');
   document.getElementById('sReqInicio').value = '';
   document.getElementById('sReqFim').value    = '';
   document.getElementById('sReqDiasInfo').style.display = 'none';
-
+  document.getElementById('sReqAbono').checked = false;
   if (p) {
     const {saldo} = _calcSaldo(p);
-
-    // Data mínima para início das férias = dia seguinte ao fim do período aquisitivo
-    const minDate = new Date(p.periodo_fim + 'T12:00:00');
-    minDate.setDate(minDate.getDate() + 1);
+    const minDate = new Date(p.periodo_fim+'T12:00:00');
+    minDate.setDate(minDate.getDate()+1);
     const minDateStr = minDate.toISOString().split('T')[0];
-
-    if (tipo === 'ferias') {
-      lbl.textContent = `Dias disponíveis: ${saldo} · Férias a partir de: ${_fmtDate(minDateStr)}`;
-      // Define data mínima nos campos de data
-      document.getElementById('sReqInicio').min = minDateStr;
-      document.getElementById('sReqFim').min    = minDateStr;
-    } else if (tipo === 'abono_pecuniario') {
-      lbl.textContent = `Dias disponíveis: ${saldo}`;
-      const infoEl = document.getElementById('sReqDiasInfo');
-      const calcEl = document.getElementById('sReqDiasCalc');
-      const infoDiv = infoEl.querySelector('div');
-      if (saldo >= 10) {
-        infoDiv.style.background    = '#f0f9ff';
-        infoDiv.style.borderColor   = '#bae6fd';
-        infoDiv.style.color         = '#0369a1';
-        calcEl.textContent = `10 dias serão deduzidos do seu saldo. Saldo restante após aprovação: ${saldo - 10} dias.`;
-      } else {
-        infoDiv.style.background    = '#fef2f2';
-        infoDiv.style.borderColor   = '#fecaca';
-        infoDiv.style.color         = '#b91c1c';
-        calcEl.textContent = `Saldo insuficiente. Você precisa de pelo menos 10 dias disponíveis para solicitar o abono pecuniário.`;
-      }
-      infoEl.style.display = 'block';
-    }
+    lbl.textContent = `Dias disponíveis: ${saldo} · Férias a partir de: ${_fmtDate(minDateStr)}`;
+    document.getElementById('sReqInicio').min = minDateStr;
+    document.getElementById('sReqFim').min    = minDateStr;
   } else {
     lbl.textContent = 'Dias disponíveis: —';
     document.getElementById('sReqInicio').removeAttribute('min');
@@ -548,53 +505,64 @@ function onSReqPeriodoChange() {
 }
 
 function calcSReqDias() {
-  const ini = document.getElementById('sReqInicio').value;
-  const fim = document.getElementById('sReqFim').value;
+  const ini    = document.getElementById('sReqInicio').value;
+  const fim    = document.getElementById('sReqFim').value;
+  const abono  = document.getElementById('sReqAbono').checked;
   const infoEl = document.getElementById('sReqDiasInfo');
   const calcEl = document.getElementById('sReqDiasCalc');
   if (!ini||!fim) { infoEl.style.display='none'; return; }
-  const dias = Math.round((new Date(fim+'T12:00:00')-new Date(ini+'T12:00:00'))/86400000)+1;
-  if (dias<=0) { infoEl.style.display='none'; return; }
-  const id = document.getElementById('sReqPeriodo').value;
-  const p  = myPeriodos.find(x=>x.id===id);
-  const saldo = p?_calcSaldo(p).saldo:null;
-  calcEl.textContent = `${dias} dias selecionados${saldo!==null?` · Saldo: ${saldo} dias`:''}${saldo!==null&&dias>saldo?' ⚠ Excede o saldo disponível':''}`;
+  const diasFerias = Math.round((new Date(fim+'T12:00:00')-new Date(ini+'T12:00:00'))/86400000)+1;
+  if (diasFerias<=0) { infoEl.style.display='none'; return; }
+  const diasAbono = abono ? 10 : 0;
+  const totalDias = diasFerias + diasAbono;
+  const id    = document.getElementById('sReqPeriodo').value;
+  const p     = myPeriodos.find(x=>x.id===id);
+  const saldo = p ? _calcSaldo(p).saldo : null;
+  const excede = saldo !== null && totalDias > saldo;
+  const infoDiv = infoEl.querySelector('div');
+  infoDiv.style.background   = excede ? '#fef2f2' : '#f0f9ff';
+  infoDiv.style.borderColor  = excede ? '#fecaca' : '#bae6fd';
+  infoDiv.style.color        = excede ? '#b91c1c' : '#0369a1';
+  let txt = `${diasFerias} dias de férias`;
+  if (abono) txt += ` + 10 dias de abono pecuniário = <strong>${totalDias} dias no total</strong>`;
+  if (saldo !== null) txt += ` · Saldo disponível: ${saldo} dias`;
+  if (excede) txt += ' ⚠ Excede o saldo disponível';
+  else if (saldo !== null) txt += ` · Saldo restante após aprovação: <strong>${saldo - totalDias} dias</strong>`;
+  calcEl.innerHTML = txt;
   infoEl.style.display = 'block';
 }
 
 async function enviarSolicitacao() {
-  const periodoId = document.getElementById('sReqPeriodo').value;
-  const tipo      = document.getElementById('sReqTipo').value;
-  const obs       = document.getElementById('sReqObs').value.trim();
-  const isAbono   = tipo === 'abono_pecuniario';
+  const periodoId   = document.getElementById('sReqPeriodo').value;
+  const obs         = document.getElementById('sReqObs').value.trim();
+  const comAbono    = document.getElementById('sReqAbono').checked;
+  const inicio      = document.getElementById('sReqInicio').value;
+  const fim         = document.getElementById('sReqFim').value;
 
   if (!periodoId) { toast('Selecione o período aquisitivo','e'); return; }
+  if (!inicio||!fim) { toast('Preencha as datas de início e fim','e'); return; }
   const p = myPeriodos.find(x=>x.id===periodoId);
   if (!p) { toast('Período não encontrado','e'); return; }
   const {saldo} = _calcSaldo(p);
 
-  let inicio, fim, dias;
-  if (isAbono) {
-    if (saldo < 10) { toast('Saldo insuficiente. Você precisa de pelo menos 10 dias disponíveis.','e'); return; }
-    dias   = 10;
-    // usa datas do período como referência
-    inicio = p.periodo_inicio;
-    fim    = p.periodo_fim;
-  } else {
-    inicio = document.getElementById('sReqInicio').value;
-    fim    = document.getElementById('sReqFim').value;
-    if (!inicio||!fim) { toast('Preencha as datas de início e fim','e'); return; }
-    dias = Math.round((new Date(fim+'T12:00:00')-new Date(inicio+'T12:00:00'))/86400000)+1;
-    if (dias<=0) { toast('Data de fim deve ser após a data de início','e'); return; }
-    if (dias > saldo) { toast(`Saldo insuficiente. Você tem ${saldo} dias disponíveis`,'e'); return; }
-    // Valida que as férias começam após o período aquisitivo
-    const minDate = new Date(p.periodo_fim+'T12:00:00');
-    minDate.setDate(minDate.getDate()+1);
-    if (new Date(inicio+'T12:00:00') < minDate) {
-      toast(`As férias só podem ser iniciadas a partir de ${minDate.toLocaleDateString('pt-BR')} (após o fim do período aquisitivo).`, 'e');
-      return;
-    }
+  const diasFerias = Math.round((new Date(fim+'T12:00:00')-new Date(inicio+'T12:00:00'))/86400000)+1;
+  if (diasFerias<=0) { toast('Data de fim deve ser após a data de início','e'); return; }
+
+  const diasAbono = comAbono ? 10 : 0;
+  const totalDias = diasFerias + diasAbono;
+
+  if (totalDias > saldo) { toast(`Saldo insuficiente. Você tem ${saldo} dias disponíveis e está solicitando ${totalDias}.`,'e'); return; }
+
+  // Valida data mínima
+  const minDate = new Date(p.periodo_fim+'T12:00:00');
+  minDate.setDate(minDate.getDate()+1);
+  if (new Date(inicio+'T12:00:00') < minDate) {
+    toast(`As férias só podem ser iniciadas a partir de ${minDate.toLocaleDateString('pt-BR')}.`,'e');
+    return;
   }
+
+  const dias  = totalDias;
+  const tipo  = comAbono ? 'ferias_e_abono' : 'ferias';
 
   const data = {
     colaborador_uid:   currentUser.uid,
@@ -606,6 +574,8 @@ async function enviarSolicitacao() {
     data_inicio:       inicio,
     data_fim:          fim,
     dias,
+    dias_ferias:       diasFerias,
+    dias_abono:        diasAbono,
     tipo,
     obs_colaborador:   obs,
     obs_lider:         '',
@@ -747,7 +717,7 @@ function _renderSolicTable(list, step) {
       <td><strong style="color:#1a2535">${s.colaborador_nome}</strong></td>
       <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
       <td style="text-align:center"><strong>${s.dias}</strong></td>
-      <td><span class="badge ${s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
+      <td><span class="badge ${s.tipo==='ferias_e_abono'?'badge-orange':s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='ferias_e_abono'?'Férias + Abono':s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
       <td style="font-size:12px;color:#64748b">${s.obs_colaborador||'—'}</td>
       <td><button class="btn btn-sm btn-primary" onclick="openPSolicModal('${s.id}','${step}')">Analisar</button></td>
     </tr>`).join('')}</tbody></table>`;
@@ -761,7 +731,7 @@ function openPSolicModal(id, step) {
     <div style="background:#f8fafc;border-radius:10px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Colaborador</div><strong>${s.colaborador_nome}</strong></div>
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Período</div>${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</div>
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong> (${s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'})</div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong>${s.tipo==='ferias_e_abono'?` (${s.dias_ferias||s.dias-10} dias de férias + 10 dias abono)`:s.tipo==='abono_pecuniario'?' (Abono Pecuniário)':s.tipo==='abono'?' (Abono)':' (Férias)'}</div>
       ${s.obs_colaborador?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Obs.</div>${s.obs_colaborador}</div>`:''}
     </div>`;
   document.getElementById('pSolicObs').value = '';
