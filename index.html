@@ -3984,9 +3984,27 @@ async function saveUsuario() {
       uid = cred.user.uid;
     } catch(authErr) {
       if (authErr.code==='auth/email-already-in-use') {
-        const ex = allFerUsuarios.find(u=>u.email===email);
-        if (ex) { await db.collection('usuarios').doc(ex.id).update(userData); Object.assign(ex,userData); }
-        await sAuth.signOut(); sec.delete(); closeUsuarioModal(); renderFerUsuarios(); toast('Perfil atualizado!'); return;
+        let existingUid;
+        // Se for o próprio usuário logado, pega o UID diretamente
+        if (email === auth.currentUser?.email) {
+          existingUid = auth.currentUser.uid;
+        } else {
+          // Tenta logar com a senha informada para obter o UID
+          try {
+            const cred2 = await sAuth.signInWithEmailAndPassword(email, senha);
+            existingUid = cred2.user.uid;
+          } catch(e2) {
+            await sAuth.signOut(); sec.delete();
+            toast('Conta já existe mas a senha está incorreta. Use "Reenviar Senha" para o colaborador definir a senha.','e');
+            return;
+          }
+        }
+        await sAuth.signOut(); sec.delete();
+        await db.collection('usuarios').doc(existingUid).set(userData);
+        const exIdx = allFerUsuarios.findIndex(u=>u.email===email);
+        if (exIdx>=0) allFerUsuarios[exIdx]={id:existingUid,...userData};
+        else allFerUsuarios.push({id:existingUid,...userData});
+        closeUsuarioModal(); renderFerUsuarios(); toast('Perfil salvo!'); return;
       }
       throw authErr;
     }
