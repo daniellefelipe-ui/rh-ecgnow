@@ -215,6 +215,15 @@
         <select id="dashAnoFilter" class="form-select" onchange="buildDashboard()" style="width:100px">
           <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
         </select>
+        <select id="dashMesFilter" class="form-select" onchange="buildDashboard()" style="width:130px">
+          <option value="">Todos os meses</option>
+          <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+          <option value="03">Março</option><option value="04">Abril</option>
+          <option value="05">Maio</option><option value="06">Junho</option>
+          <option value="07">Julho</option><option value="08">Agosto</option>
+          <option value="09">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
       </div>
       <div class="kpi-grid" id="dashKpis">
         <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
@@ -1407,6 +1416,7 @@ async function loadAll() {
   await loadEnps();
   await loadEsat();
   await loadFerias();
+  buildDashboard();
 }
 
 // ══ COLABORADORES ══════════════════════════════════════════
@@ -1416,7 +1426,6 @@ async function loadColabs() {
     allColabs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderColabTable(allColabs);
     populateHcColab();
-    buildDashboard();
   } catch(e) { toast('Erro ao carregar colaboradores', 'e'); }
 }
 
@@ -4225,6 +4234,9 @@ let chartTempoCasa = null, chartDashAbs = null, chartDashRot = null;
 
 function buildDashboard() {
   const ano      = parseInt(document.getElementById('dashAnoFilter')?.value) || new Date().getFullYear();
+  const mes      = document.getElementById('dashMesFilter')?.value || '';
+  const periodo  = mes ? `${ano}-${mes}` : null;
+
   const ativos   = allColabs.filter(c => /^ativ/i.test(c.status));
   const inativos = allColabs.filter(c => !/^ativ/i.test(c.status));
   const pj   = ativos.filter(c => c.tipo_contrato === 'PJ').length;
@@ -4232,20 +4244,33 @@ function buildDashboard() {
   const fem  = ativos.filter(c => c.genero === 'F').length;
   const masc = ativos.filter(c => c.genero === 'M').length;
 
-  const absAno = allAbs.filter(r => (r.periodo||'').startsWith(String(ano)));
-  const rotAno = allRot.filter(r => (r.periodo||'').startsWith(String(ano)));
-  const mediaAbs = absAno.length ? (absAno.reduce((s,r)=>s+(r.percentual||0),0)/absAno.length).toFixed(2) : '—';
-  const mediaRot = rotAno.length ? (rotAno.reduce((s,r)=>s+(r.percentual||0),0)/rotAno.length).toFixed(2) : '—';
-  const totalAdm = rotAno.reduce((s,r)=>s+(r.admissoes||0),0);
-  const totalDem = rotAno.reduce((s,r)=>s+(r.demissoes||0),0);
+  // KPIs de abs e rot: mês específico ou média do ano
+  let absKpiVal, rotKpiVal, rotAdmKpi, rotDemKpi, kpiLbl;
+  if (periodo) {
+    const absR = allAbs.find(r => r.periodo === periodo);
+    const rotR = allRot.find(r => r.periodo === periodo);
+    absKpiVal = absR ? absR.percentual?.toFixed(2)+'%' : '—';
+    rotKpiVal = rotR ? rotR.percentual?.toFixed(2)+'%' : '—';
+    rotAdmKpi = rotR ? rotR.admissoes||0 : '—';
+    rotDemKpi = rotR ? rotR.demissoes||0 : '—';
+    kpiLbl = (MESES_NOME[parseInt(mes)]||mes) + '/' + ano;
+  } else {
+    const absAno = allAbs.filter(r => (r.periodo||'').startsWith(String(ano)));
+    const rotAno = allRot.filter(r => (r.periodo||'').startsWith(String(ano)));
+    absKpiVal = absAno.length ? (absAno.reduce((s,r)=>s+(r.percentual||0),0)/absAno.length).toFixed(2)+'%' : '—';
+    rotKpiVal = rotAno.length ? (rotAno.reduce((s,r)=>s+(r.percentual||0),0)/rotAno.length).toFixed(2)+'%' : '—';
+    rotAdmKpi = rotAno.reduce((s,r)=>s+(r.admissoes||0),0);
+    rotDemKpi = rotAno.reduce((s,r)=>s+(r.demissoes||0),0);
+    kpiLbl = `Média ${ano}`;
+  }
 
   document.getElementById('dashKpis').innerHTML = `
     <div class="kpi-card"><div class="kpi-lbl">Total Colaboradores</div><div class="kpi-val">${ativos.length}</div><div class="kpi-sub">ativos · ${inativos.length} inativos</div></div>
     <div class="kpi-card"><div class="kpi-lbl">PJ</div><div class="kpi-val">${pj}</div><div class="kpi-sub">${ativos.length?(pj/ativos.length*100).toFixed(1):0}% do total</div></div>
     <div class="kpi-card"><div class="kpi-lbl">CLT</div><div class="kpi-val">${clt}</div><div class="kpi-sub">${ativos.length?(clt/ativos.length*100).toFixed(1):0}% do total</div></div>
     <div class="kpi-card"><div class="kpi-lbl">Gênero</div><div class="kpi-val" style="font-size:20px">${fem}F · ${masc}M</div><div class="kpi-sub">feminino · masculino</div></div>
-    <div class="kpi-card"><div class="kpi-lbl">Absenteísmo Médio ${ano}</div><div class="kpi-val" style="color:#0b4e7d">${mediaAbs}%</div><div class="kpi-sub">${absAno.length} meses registrados</div></div>
-    <div class="kpi-card"><div class="kpi-lbl">Turnover Médio ${ano}</div><div class="kpi-val" style="color:#0b4e7d">${mediaRot}%</div><div class="kpi-sub">Adm: ${totalAdm} · Dem: ${totalDem}</div></div>`;
+    <div class="kpi-card"><div class="kpi-lbl">Absenteísmo · ${kpiLbl}</div><div class="kpi-val" style="color:#0b4e7d">${absKpiVal}</div><div class="kpi-sub">${mes?'mês selecionado':'média anual'}</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Turnover · ${kpiLbl}</div><div class="kpi-val" style="color:#0b4e7d">${rotKpiVal}</div><div class="kpi-sub">Adm: ${rotAdmKpi} · Dem: ${rotDemKpi}</div></div>`;
 
   // Tipo de Contrato
   const tipos = {};
@@ -4297,26 +4322,35 @@ function buildDashboard() {
     return r ? (r[campo]??null) : null;
   });
 
-  document.getElementById('dashAnoAbsLbl').textContent = ano;
-  document.getElementById('dashAnoRotLbl').textContent = ano;
+  const periodoLbl = mes ? (MESES_NOME[parseInt(mes)]||mes)+'/'+ano : String(ano);
+  document.getElementById('dashAnoAbsLbl').textContent = periodoLbl;
+  document.getElementById('dashAnoRotLbl').textContent = periodoLbl;
+  // Índice do mês selecionado para destacar no gráfico (0-based)
+  const mesSel = mes ? parseInt(mes)-1 : -1;
 
-  // Absenteísmo por mês
+  // Cores dos pontos: destaca o mês selecionado
+  const absData = _getMes(allAbs,'percentual');
+  const absPtColors = absData.map((_,i)=> i===mesSel ? '#e53e3e' : '#0b4e7d');
+  const absPtRadius = absData.map((_,i)=> i===mesSel ? 7 : 4);
+
   if (chartDashAbs) chartDashAbs.destroy();
   chartDashAbs = new Chart(document.getElementById('chartDashAbs'), {
     type:'line',
-    data:{ labels:mesesLabel, datasets:[{ label:'% Absenteísmo', data:_getMes(allAbs,'percentual'),
+    data:{ labels:mesesLabel, datasets:[{ label:'% Absenteísmo', data:absData,
       borderColor:'#0b4e7d', backgroundColor:'rgba(11,78,125,0.08)', tension:0.3, fill:true,
-      pointRadius:4, pointBackgroundColor:'#0b4e7d', spanGaps:true }]},
+      pointRadius:absPtRadius, pointBackgroundColor:absPtColors, spanGaps:true }]},
     options:{ plugins:{legend:{display:false}},
       scales:{ y:{ ticks:{callback:v=>v+'%',font:{size:10}}, grid:{color:'#f0f4f8'} }, x:{grid:{display:false}} } }
   });
 
-  // Rotatividade por mês
+  const rotData = _getMes(allRot,'percentual');
+  const rotBgColors = rotData.map((_,i)=> i===mesSel ? '#e53e3e' : 'rgba(26,143,227,0.7)');
+
   if (chartDashRot) chartDashRot.destroy();
   chartDashRot = new Chart(document.getElementById('chartDashRot'), {
     type:'bar',
     data:{ labels:mesesLabel, datasets:[
-      { label:'% Turnover', data:_getMes(allRot,'percentual'), backgroundColor:'rgba(26,143,227,0.7)', borderRadius:4, yAxisID:'y', spanGaps:true },
+      { label:'% Turnover', data:rotData, backgroundColor:rotBgColors, borderRadius:4, yAxisID:'y', spanGaps:true },
       { label:'Admissões',  data:_getMes(allRot,'admissoes'),  type:'line', borderColor:'#00a878', tension:0.3, pointRadius:3, fill:false, yAxisID:'y2', spanGaps:true },
       { label:'Demissões',  data:_getMes(allRot,'demissoes'),  type:'line', borderColor:'#e53e3e', tension:0.3, pointRadius:3, fill:false, yAxisID:'y2', spanGaps:true }
     ]},
