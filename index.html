@@ -3017,16 +3017,20 @@ function verNotasEsat(id) {
 function _buildEsatNotasGrid(notasSalvas) {
   const grid = document.getElementById('esatNotasGrid');
 
-  // Se editando: parte dos nomes que têm nota salva; se novo: lista atual
-  let linhas;
-  if (notasSalvas && notasSalvas.length) {
-    // Garante que colaboradores atuais sem nota ainda apareçam, mas só os com nota de períodos anteriores extras
-    const portalNomes = new Set(USUARIOS_PORTAL.map(u => u.nome));
-    const extras = notasSalvas.filter(n => n.nome && !portalNomes.has(n.nome)).map(n => n.nome);
-    linhas = [...USUARIOS_PORTAL.map(u => u.nome), ...extras];
-  } else {
-    linhas = USUARIOS_PORTAL.map(u => u.nome);
-  }
+  const portalNomes = new Set(USUARIOS_PORTAL.map(u => u.nome));
+
+  // Nomes extras que aparecem com nota em qualquer pesquisa anterior
+  const extrasHistorico = new Set();
+  allEsat.forEach(e => (e.notas||[]).forEach(n => {
+    if (n.nome && !portalNomes.has(n.nome)) extrasHistorico.add(n.nome);
+  }));
+
+  // Se editando: também inclui extras do próprio registro
+  if (notasSalvas) notasSalvas.forEach(n => {
+    if (n.nome && !portalNomes.has(n.nome)) extrasHistorico.add(n.nome);
+  });
+
+  const linhas = [...USUARIOS_PORTAL.map(u => u.nome), ...[...extrasHistorico].sort()];
 
   function _rowHtml(nome, i, val, removivel) {
     const nomeField = removivel
