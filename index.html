@@ -284,6 +284,16 @@
         <div class="card-header"><span class="card-title">Custo Mensal por Colaborador</span></div>
         <canvas id="chartHc" height="100"></canvas>
       </div>
+      <div class="charts-row-2" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Benefícios por Colaborador</span></div>
+          <canvas id="chartHcBenef" height="200"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Salário e Encargos por Colaborador</span></div>
+          <canvas id="chartHcSalario" height="200"></canvas>
+        </div>
+      </div>
       <div class="card">
         <div class="card-header">
           <span class="card-title" id="hcTitle">Custos por Colaborador</span>
@@ -1407,7 +1417,7 @@ function calcTempoCasa(admissao, demissao, status) {
 }
 
 let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [], allTrein = [], allEnps = [], allEsat = [], allFin = [];
-let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null, chartEnps = null, chartEsat = null, chartHc = null;
+let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null, chartEnps = null, chartEsat = null, chartHc = null, chartHcBenef = null, chartHcSalario = null;
 
 async function loadAll() {
   await loadColabs();
@@ -1599,17 +1609,48 @@ function renderHcKpis(hc, ano) {
   const nomes  = sorted.map(r => (r.colaborador_nome||'').split(' ').slice(0,2).join(' '));
   const vals   = sorted.map(r => custoMensal(r));
   const cores  = sorted.map(r => r.tipo_contrato === 'CLT' ? '#0b4e7d' : '#1a8fe3');
+  const chartOpts = (stacked) => ({
+    plugins: { legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:10, padding:10 } }, tooltip:{ callbacks:{ label: ctx => ctx.dataset.label+': '+fmt(ctx.raw) } } },
+    scales: {
+      x: { stacked, grid:{display:false}, ticks:{font:{size:10}} },
+      y: { stacked, ticks:{ callback: v => 'R$'+v.toLocaleString('pt-BR'), font:{size:10} }, grid:{color:'#f0f4f8'} }
+    }
+  });
+
   if (chartHc) chartHc.destroy();
   chartHc = new Chart(document.getElementById('chartHc'), {
     type: 'bar',
     data: { labels: nomes, datasets: [{ label: 'Custo Mensal', data: vals, backgroundColor: cores, borderRadius: 5, borderSkipped: false }] },
     options: {
-      plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => fmt(ctx.raw) } } },
-      scales: {
-        x: { grid:{display:false}, ticks:{font:{size:10}} },
-        y: { ticks:{ callback: v => 'R$'+v.toLocaleString('pt-BR'), font:{size:10} }, grid:{color:'#f0f4f8'} }
-      }
+      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx => fmt(ctx.raw) } } },
+      scales: { x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ ticks:{ callback: v => 'R$'+v.toLocaleString('pt-BR'), font:{size:10} }, grid:{color:'#f0f4f8'} } }
     }
+  });
+
+  // Gráfico 2 — Benefícios (empilhado)
+  if (chartHcBenef) chartHcBenef.destroy();
+  chartHcBenef = new Chart(document.getElementById('chartHcBenef'), {
+    type: 'bar',
+    data: { labels: nomes, datasets: [
+      { label:'Benefícios',  data: sorted.map(r => r.beneficios||0),      backgroundColor:'#0b4e7d', borderRadius:0 },
+      { label:'Vale Home',   data: sorted.map(r => r.vale_home||0),        backgroundColor:'#1a8fe3', borderRadius:0 },
+      { label:'Seguro Saúde',data: sorted.map(r => r.seguro_saude||0),     backgroundColor:'#00a878', borderRadius:0 },
+    ]},
+    options: chartOpts(true)
+  });
+
+  // Gráfico 3 — Salário e encargos (empilhado)
+  if (chartHcSalario) chartHcSalario.destroy();
+  chartHcSalario = new Chart(document.getElementById('chartHcSalario'), {
+    type: 'bar',
+    data: { labels: nomes, datasets: [
+      { label:'Salário Bruto',        data: sorted.map(r => r.salario_bruto||0),      backgroundColor:'#0b4e7d', borderRadius:0 },
+      { label:'Impostos',             data: sorted.map(r => r.impostos||0),            backgroundColor:'#1a8fe3', borderRadius:0 },
+      { label:'Férias',               data: sorted.map(r => r.ferias||0),              backgroundColor:'#d97706', borderRadius:0 },
+      { label:'13°',                  data: sorted.map(r => r.decimo_terceiro||0),     backgroundColor:'#00a878', borderRadius:0 },
+      { label:'Imp. Férias + 13°',    data: sorted.map(r => r.impostos_ferias_13||0),  backgroundColor:'#7c3aed', borderRadius:0 },
+    ]},
+    options: chartOpts(true)
   });
 }
 
