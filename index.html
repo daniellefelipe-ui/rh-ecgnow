@@ -126,6 +126,7 @@
     .search-bar { padding: 9px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: 'DM Sans',sans-serif; outline: none; width: 240px; transition: all .2s; background: #fafbfc; }
     .search-bar:focus { border-color: #1a8fe3; box-shadow: 0 0 0 3px rgba(26,143,227,.08); background: white; }
     .charts-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .charts-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
     .currency { font-family: 'Plus Jakarta Sans',sans-serif; font-weight: 600; }
 
     /* ── Toast ── */
@@ -209,18 +210,37 @@
 
   <main class="main">
     <section class="page-section active" id="sec-dashboard">
-      <div class="page-header"><h1>Dashboard</h1></div>
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <select id="dashAnoFilter" class="form-select" onchange="buildDashboard()" style="width:100px">
+          <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+        </select>
+      </div>
       <div class="kpi-grid" id="dashKpis">
         <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
       </div>
-      <div class="charts-row-2">
+      <div class="charts-row-3">
         <div class="card">
           <div class="card-header"><span class="card-title">Tipo de Contrato</span></div>
-          <canvas id="chartTipo" height="200"></canvas>
+          <canvas id="chartTipo" height="220"></canvas>
         </div>
         <div class="card">
           <div class="card-header"><span class="card-title">Colaboradores por Setor</span></div>
-          <canvas id="chartSetor" height="200"></canvas>
+          <canvas id="chartSetor" height="220"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Tempo de Casa</span></div>
+          <canvas id="chartTempoCasa" height="220"></canvas>
+        </div>
+      </div>
+      <div class="charts-row-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Absenteísmo por Mês</span><span id="dashAnoAbsLbl" style="font-size:12px;color:#94a3b8"></span></div>
+          <canvas id="chartDashAbs" height="160"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Rotatividade por Mês</span><span id="dashAnoRotLbl" style="font-size:12px;color:#94a3b8"></span></div>
+          <canvas id="chartDashRot" height="160"></canvas>
         </div>
       </div>
     </section>
@@ -4201,7 +4221,10 @@ function enviarEmailNotificacao(tipo, solic) {
 }
 
 // ══ DASHBOARD ══════════════════════════════════════════════
+let chartTempoCasa = null, chartDashAbs = null, chartDashRot = null;
+
 function buildDashboard() {
+  const ano      = parseInt(document.getElementById('dashAnoFilter')?.value) || new Date().getFullYear();
   const ativos   = allColabs.filter(c => /^ativ/i.test(c.status));
   const inativos = allColabs.filter(c => !/^ativ/i.test(c.status));
   const pj   = ativos.filter(c => c.tipo_contrato === 'PJ').length;
@@ -4209,12 +4232,22 @@ function buildDashboard() {
   const fem  = ativos.filter(c => c.genero === 'F').length;
   const masc = ativos.filter(c => c.genero === 'M').length;
 
+  const absAno = allAbs.filter(r => (r.periodo||'').startsWith(String(ano)));
+  const rotAno = allRot.filter(r => (r.periodo||'').startsWith(String(ano)));
+  const mediaAbs = absAno.length ? (absAno.reduce((s,r)=>s+(r.percentual||0),0)/absAno.length).toFixed(2) : '—';
+  const mediaRot = rotAno.length ? (rotAno.reduce((s,r)=>s+(r.percentual||0),0)/rotAno.length).toFixed(2) : '—';
+  const totalAdm = rotAno.reduce((s,r)=>s+(r.admissoes||0),0);
+  const totalDem = rotAno.reduce((s,r)=>s+(r.demissoes||0),0);
+
   document.getElementById('dashKpis').innerHTML = `
     <div class="kpi-card"><div class="kpi-lbl">Total Colaboradores</div><div class="kpi-val">${ativos.length}</div><div class="kpi-sub">ativos · ${inativos.length} inativos</div></div>
     <div class="kpi-card"><div class="kpi-lbl">PJ</div><div class="kpi-val">${pj}</div><div class="kpi-sub">${ativos.length?(pj/ativos.length*100).toFixed(1):0}% do total</div></div>
     <div class="kpi-card"><div class="kpi-lbl">CLT</div><div class="kpi-val">${clt}</div><div class="kpi-sub">${ativos.length?(clt/ativos.length*100).toFixed(1):0}% do total</div></div>
-    <div class="kpi-card"><div class="kpi-lbl">Gênero</div><div class="kpi-val" style="font-size:20px">${fem}F · ${masc}M</div><div class="kpi-sub">feminino · masculino</div></div>`;
+    <div class="kpi-card"><div class="kpi-lbl">Gênero</div><div class="kpi-val" style="font-size:20px">${fem}F · ${masc}M</div><div class="kpi-sub">feminino · masculino</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Absenteísmo Médio ${ano}</div><div class="kpi-val" style="color:#0b4e7d">${mediaAbs}%</div><div class="kpi-sub">${absAno.length} meses registrados</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Turnover Médio ${ano}</div><div class="kpi-val" style="color:#0b4e7d">${mediaRot}%</div><div class="kpi-sub">Adm: ${totalAdm} · Dem: ${totalDem}</div></div>`;
 
+  // Tipo de Contrato
   const tipos = {};
   ativos.forEach(c => { const t = c.tipo_contrato||'N/A'; tipos[t]=(tipos[t]||0)+1; });
   if (chartTipo) chartTipo.destroy();
@@ -4224,13 +4257,71 @@ function buildDashboard() {
     options: { cutout:'62%', plugins: { legend: { position:'bottom', labels:{ font:{size:11}, boxWidth:10, padding:12 } } } }
   });
 
+  // Por Setor
   const setores = {};
   ativos.forEach(c => { const s = c.setor||'N/A'; setores[s]=(setores[s]||0)+1; });
   if (chartSetor) chartSetor.destroy();
   chartSetor = new Chart(document.getElementById('chartSetor'), {
     type: 'bar',
     data: { labels: Object.keys(setores), datasets: [{ data: Object.values(setores), backgroundColor: '#1a8fe3', borderRadius: 6, borderSkipped: false }] },
-    options: { plugins:{ legend:{display:false} }, scales: { x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ display:false } } }
+    options: { plugins:{ legend:{display:false} }, scales: { x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ ticks:{stepSize:1}, grid:{color:'#f0f4f8'} } } }
+  });
+
+  // Tempo de Casa
+  const hoje = new Date();
+  const faixas = { 'Menos de 1 ano':0, '1 a 2 anos':0, '2 a 5 anos':0, 'Mais de 5 anos':0 };
+  ativos.forEach(c => {
+    const adm = c.data_admissao; if (!adm) return;
+    let d;
+    if (/^\d{4}-\d{2}-\d{2}/.test(adm))        d = new Date(adm.slice(0,10));
+    else if (/^\d{2}\/\d{2}\/\d{4}/.test(adm)) { const [dd,mm,yy]=adm.split('/'); d=new Date(`${yy}-${mm}-${dd}`); }
+    else return;
+    const anos = (hoje - d) / (365.25*24*3600*1000);
+    if      (anos < 1) faixas['Menos de 1 ano']++;
+    else if (anos < 2) faixas['1 a 2 anos']++;
+    else if (anos < 5) faixas['2 a 5 anos']++;
+    else               faixas['Mais de 5 anos']++;
+  });
+  if (chartTempoCasa) chartTempoCasa.destroy();
+  chartTempoCasa = new Chart(document.getElementById('chartTempoCasa'), {
+    type: 'bar',
+    data: { labels: Object.keys(faixas), datasets: [{ data: Object.values(faixas), backgroundColor: ['#1a8fe3','#0b4e7d','#00a878','#d97706'], borderRadius: 6, borderSkipped: false }] },
+    options: { plugins:{ legend:{display:false} }, scales: { x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ ticks:{stepSize:1}, grid:{color:'#f0f4f8'} } } }
+  });
+
+  // Labels de meses para o ano selecionado
+  const mesesLabel = Array.from({length:12},(_,i)=>(MESES_NOME[i+1]||'').slice(0,3));
+  const _getMes = (col, campo) => Array.from({length:12},(_,i)=>{
+    const per = `${ano}-${String(i+1).padStart(2,'0')}`;
+    const r = col.find(x=>x.periodo===per);
+    return r ? (r[campo]??null) : null;
+  });
+
+  document.getElementById('dashAnoAbsLbl').textContent = ano;
+  document.getElementById('dashAnoRotLbl').textContent = ano;
+
+  // Absenteísmo por mês
+  if (chartDashAbs) chartDashAbs.destroy();
+  chartDashAbs = new Chart(document.getElementById('chartDashAbs'), {
+    type:'line',
+    data:{ labels:mesesLabel, datasets:[{ label:'% Absenteísmo', data:_getMes(allAbs,'percentual'),
+      borderColor:'#0b4e7d', backgroundColor:'rgba(11,78,125,0.08)', tension:0.3, fill:true,
+      pointRadius:4, pointBackgroundColor:'#0b4e7d', spanGaps:true }]},
+    options:{ plugins:{legend:{display:false}},
+      scales:{ y:{ ticks:{callback:v=>v+'%',font:{size:10}}, grid:{color:'#f0f4f8'} }, x:{grid:{display:false}} } }
+  });
+
+  // Rotatividade por mês
+  if (chartDashRot) chartDashRot.destroy();
+  chartDashRot = new Chart(document.getElementById('chartDashRot'), {
+    type:'bar',
+    data:{ labels:mesesLabel, datasets:[
+      { label:'% Turnover', data:_getMes(allRot,'percentual'), backgroundColor:'rgba(26,143,227,0.7)', borderRadius:4, yAxisID:'y', spanGaps:true },
+      { label:'Admissões',  data:_getMes(allRot,'admissoes'),  type:'line', borderColor:'#00a878', tension:0.3, pointRadius:3, fill:false, yAxisID:'y2', spanGaps:true },
+      { label:'Demissões',  data:_getMes(allRot,'demissoes'),  type:'line', borderColor:'#e53e3e', tension:0.3, pointRadius:3, fill:false, yAxisID:'y2', spanGaps:true }
+    ]},
+    options:{ plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:10, padding:10 } } },
+      scales:{ y:{ position:'left', ticks:{callback:v=>v+'%',font:{size:10}} }, y2:{ position:'right', grid:{drawOnChartArea:false}, ticks:{stepSize:1,font:{size:10}} } } }
   });
 }
 </script>
