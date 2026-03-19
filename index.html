@@ -3017,20 +3017,28 @@ function verNotasEsat(id) {
 function _buildEsatNotasGrid(notasSalvas) {
   const grid = document.getElementById('esatNotasGrid');
 
-  const portalNomes = new Set(USUARIOS_PORTAL.map(u => u.nome));
+  const _norm = s => s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const portalNormSet = new Set(USUARIOS_PORTAL.map(u => _norm(u.nome)));
 
-  // Nomes extras que aparecem com nota em qualquer pesquisa anterior
-  const extrasHistorico = new Set();
+  // Extras: nomes com nota real em pesquisas salvas, que não sejam variações de nomes do portal
+  const extrasMap = new Map(); // norm → nome original
   allEsat.forEach(e => (e.notas||[]).forEach(n => {
-    if (n.nome && !portalNomes.has(n.nome)) extrasHistorico.add(n.nome);
+    if (n.nome && typeof n.nota === 'number' && !isNaN(n.nota)) {
+      const k = _norm(n.nome);
+      if (!portalNormSet.has(k) && !extrasMap.has(k)) extrasMap.set(k, n.nome.trim());
+    }
   }));
-
-  // Se editando: também inclui extras do próprio registro
   if (notasSalvas) notasSalvas.forEach(n => {
-    if (n.nome && !portalNomes.has(n.nome)) extrasHistorico.add(n.nome);
+    if (n.nome && typeof n.nota === 'number' && !isNaN(n.nota)) {
+      const k = _norm(n.nome);
+      if (!portalNormSet.has(k) && !extrasMap.has(k)) extrasMap.set(k, n.nome.trim());
+    }
   });
 
-  const linhas = [...USUARIOS_PORTAL.map(u => u.nome), ...[...extrasHistorico].sort()];
+  const linhas = [
+    ...USUARIOS_PORTAL.map(u => u.nome),
+    ...[...extrasMap.values()].sort()
+  ];
 
   function _rowHtml(nome, i, val, removivel) {
     const nomeField = removivel
