@@ -280,6 +280,10 @@
       <div class="kpi-grid" id="headcountKpis">
         <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
       </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">Custo Mensal por Colaborador</span></div>
+        <canvas id="chartHc" height="100"></canvas>
+      </div>
       <div class="card">
         <div class="card-header">
           <span class="card-title" id="hcTitle">Custos por Colaborador</span>
@@ -1403,7 +1407,7 @@ function calcTempoCasa(admissao, demissao, status) {
 }
 
 let allColabs = [], allHc = [], allAbs = [], allRot = [], allRec = [], allTrein = [], allEnps = [], allEsat = [], allFin = [];
-let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null, chartEnps = null, chartEsat = null;
+let chartTipo = null, chartSetor = null, chartAbs = null, chartRot = null, chartRecMes = null, chartRecFunil = null, chartTreinMes = null, chartEnps = null, chartEsat = null, chartHc = null;
 
 async function loadAll() {
   await loadColabs();
@@ -1579,46 +1583,99 @@ function custoMensal(r) {
 }
 
 function renderHcKpis(hc, ano) {
-  const totalM = hc.reduce((s,r) => s + custoMensal(r), 0);
-  const pj  = hc.filter(r => r.tipo_contrato === 'PJ').length;
-  const clt = hc.filter(r => r.tipo_contrato === 'CLT').length;
+  const ativos  = hc.filter(r => custoMensal(r) > 0);
+  const totalM  = ativos.reduce((s,r) => s + custoMensal(r), 0);
+  const pj      = ativos.filter(r => r.tipo_contrato === 'PJ').length;
+  const clt     = ativos.filter(r => r.tipo_contrato === 'CLT').length;
+  const mediaCM = ativos.length ? totalM / ativos.length : 0;
   document.getElementById('headcountKpis').innerHTML = `
-    <div class="kpi-card"><div class="kpi-lbl">Custo Mensal · ${ano}</div><div class="kpi-val" style="font-size:19px;color:#0b4e7d">${fmt(totalM)}</div><div class="kpi-sub">${hc.length} colaboradores</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Custo Mensal Total · ${ano}</div><div class="kpi-val" style="font-size:19px;color:#0b4e7d">${fmt(totalM)}</div><div class="kpi-sub">${ativos.length} colaboradores</div></div>
     <div class="kpi-card"><div class="kpi-lbl">Custo Anual · ${ano}</div><div class="kpi-val" style="font-size:19px;color:#0b4e7d">${fmt(totalM*12)}</div><div class="kpi-sub">projeção anual</div></div>
-    <div class="kpi-card"><div class="kpi-lbl">PJ</div><div class="kpi-val">${pj}</div><div class="kpi-sub">colaboradores PJ</div></div>
-    <div class="kpi-card"><div class="kpi-lbl">CLT</div><div class="kpi-val">${clt}</div><div class="kpi-sub">colaboradores CLT</div></div>`;
+    <div class="kpi-card"><div class="kpi-lbl">Custo Médio por Colaborador</div><div class="kpi-val" style="font-size:19px;color:#0b4e7d">${fmt(mediaCM)}</div><div class="kpi-sub">média mensal</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">PJ · CLT</div><div class="kpi-val" style="font-size:20px">${pj} · ${clt}</div><div class="kpi-sub">tipo de contrato</div></div>`;
+
+  // Gráfico
+  const sorted = [...ativos].sort((a,b) => custoMensal(b) - custoMensal(a));
+  const nomes  = sorted.map(r => (r.colaborador_nome||'').split(' ').slice(0,2).join(' '));
+  const vals   = sorted.map(r => custoMensal(r));
+  const cores  = sorted.map(r => r.tipo_contrato === 'CLT' ? '#0b4e7d' : '#1a8fe3');
+  if (chartHc) chartHc.destroy();
+  chartHc = new Chart(document.getElementById('chartHc'), {
+    type: 'bar',
+    data: { labels: nomes, datasets: [{ label: 'Custo Mensal', data: vals, backgroundColor: cores, borderRadius: 5, borderSkipped: false }] },
+    options: {
+      plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => fmt(ctx.raw) } } },
+      scales: {
+        x: { grid:{display:false}, ticks:{font:{size:10}} },
+        y: { ticks:{ callback: v => 'R$'+v.toLocaleString('pt-BR'), font:{size:10} }, grid:{color:'#f0f4f8'} }
+      }
+    }
+  });
 }
 
 function renderHcTable(hc, ano) {
   document.getElementById('hcTitle').textContent = `Custos por Colaborador · ${ano}`;
   const wrap = document.getElementById('hcTableWrap');
-  if (!hc.length) {
+  const lista = hc.filter(r => custoMensal(r) > 0);
+  if (!lista.length) {
     wrap.innerHTML = `<div class="empty-state">Nenhum registro para ${ano}.<br><small>Clique em "+ Adicionar" para inserir.</small></div>`;
     return;
   }
-  wrap.innerHTML = `<table class="table">
-    <thead><tr><th>Colaborador</th><th>Contrato</th><th>Salário Bruto</th><th>Benefícios</th><th>Férias + 13°</th><th>Outros</th><th>Custo Mensal</th><th>Custo Anual</th><th></th></tr></thead>
-    <tbody>${hc.map(r => {
+  const totalM = lista.reduce((s,r) => s + custoMensal(r), 0);
+  wrap.innerHTML = `<div style="overflow-x:auto"><table class="table" style="min-width:1300px;font-size:12px">
+    <thead><tr>
+      <th>Colaborador</th><th>Cargo</th><th style="text-align:center">Idade</th><th style="text-align:center">Contrato</th>
+      <th class="currency">Sal. Bruto</th><th class="currency">Impostos</th><th class="currency">Benefícios</th>
+      <th class="currency">Vale Home</th><th class="currency">Seg. Trabalho</th><th class="currency">Férias</th>
+      <th class="currency">13°</th><th class="currency">Imp. Fér+13°</th><th class="currency">GoWork</th>
+      <th class="currency">Seg. Saúde</th><th class="currency" style="color:#0b4e7d">Custo Mensal</th>
+      <th class="currency">Custo Anual</th><th></th>
+    </tr></thead>
+    <tbody>${lista.map(r => {
       const mensal = custoMensal(r);
-      const benef  = (r.beneficios||0)+(r.vale_home||0)+(r.seguro_saude||0)+(r.seguranca_trabalho||0);
-      const f13    = (r.ferias||0)+(r.decimo_terceiro||0)+(r.impostos_ferias_13||0);
-      const outros = (r.posicao_gowork||0)+(r.impostos||0);
       const tc     = r.tipo_contrato||'—';
+      const colab  = allColabs.find(c => c.id === r.colaborador_id);
+      const cargo  = r.cargo || colab?.cargo || '—';
       return `<tr>
-        <td><strong style="color:#1a2535">${r.colaborador_nome||'—'}</strong></td>
-        <td><span class="badge ${tc==='CLT'?'badge-blue':'badge-orange'}">${tc}</span></td>
+        <td><strong style="color:#1a2535;white-space:nowrap">${r.colaborador_nome||'—'}</strong></td>
+        <td style="white-space:nowrap">${cargo}</td>
+        <td style="text-align:center">${r.idade||'—'}</td>
+        <td style="text-align:center"><span class="badge ${tc==='CLT'?'badge-blue':'badge-orange'}">${tc}</span></td>
         <td class="currency">${fmt(r.salario_bruto)}</td>
-        <td class="currency">${fmt(benef)}</td>
-        <td class="currency">${fmt(f13)}</td>
-        <td class="currency">${fmt(outros)}</td>
-        <td><strong class="currency" style="color:#0b4e7d">${fmt(mensal)}</strong></td>
+        <td class="currency">${fmt(r.impostos)}</td>
+        <td class="currency">${fmt(r.beneficios)}</td>
+        <td class="currency">${fmt(r.vale_home)}</td>
+        <td class="currency">${fmt(r.seguranca_trabalho)}</td>
+        <td class="currency">${fmt(r.ferias)}</td>
+        <td class="currency">${fmt(r.decimo_terceiro)}</td>
+        <td class="currency">${fmt(r.impostos_ferias_13)}</td>
+        <td class="currency">${fmt(r.posicao_gowork)}</td>
+        <td class="currency">${fmt(r.seguro_saude)}</td>
+        <td class="currency"><strong style="color:#0b4e7d">${fmt(mensal)}</strong></td>
         <td class="currency">${fmt(mensal*12)}</td>
         <td><div style="display:flex;gap:6px">
           <button class="btn btn-sm btn-outline" onclick='editHc("${r.id}")'>Editar</button>
           <button class="btn btn-sm btn-danger"  onclick='deleteHc("${r.id}")'>Excluir</button>
         </div></td>
       </tr>`;
-    }).join('')}</tbody></table>`;
+    }).join('')}
+    <tr style="border-top:2px solid #e2e8f0;background:#f8fafc">
+      <td colspan="4"><strong>TOTAL</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.salario_bruto||0),0))}</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.impostos||0),0))}</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.beneficios||0),0))}</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.vale_home||0),0))}</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.seguranca_trabalho||0),0))}</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.ferias||0),0))}</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.decimo_terceiro||0),0))}</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.impostos_ferias_13||0),0))}</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.posicao_gowork||0),0))}</strong></td>
+      <td class="currency"><strong>${fmt(lista.reduce((s,r)=>s+(r.seguro_saude||0),0))}</strong></td>
+      <td class="currency"><strong style="color:#0b4e7d">${fmt(totalM)}</strong></td>
+      <td class="currency"><strong>${fmt(totalM*12)}</strong></td>
+      <td></td>
+    </tr>
+    </tbody></table></div>`;
 }
 
 function openHcModal() {
@@ -1661,6 +1718,7 @@ async function saveHc() {
   const payload = {
     colaborador_id:     cid,
     colaborador_nome:   colab ? colab.nome : '',
+    cargo:              colab ? colab.cargo||'' : '',
     tipo_contrato:      colab ? colab.tipo_contrato : '',
     ano:                parseInt(document.getElementById('hcAno').value),
     idade:              parseInt(document.getElementById('hcIdade').value)||0,
