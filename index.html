@@ -4686,7 +4686,7 @@ function verCargo(id) {
 
   // Responsabilidades
   if ((c.responsabilidades||[]).length) html += section('Principais Responsabilidades <span style="font-size:10px;font-weight:400">(O QUE, COMO, PRA QUE, QUANDO)</span>',
-    (c.responsabilidades).map((r,i) => `<div style="font-size:13px;line-height:1.6;color:#334155;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:6px;border-left:3px solid #1a8fe3"><strong>${i+1}.</strong> ${r}</div>`).join(''));
+    (c.responsabilidades).map((r,i) => `<div style="font-size:13px;line-height:1.6;color:#334155;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:6px;border-left:3px solid #1a8fe3"><strong>${i+1}.</strong> ${r.replace(/^\d+\s*[.)]\s*/,'')}</div>`).join(''));
 
   // Requisitos
   const rConhec = (c.req_conhecimentos||[]).filter(Boolean);
@@ -4930,17 +4930,30 @@ async function _parseCargoPDF(file) {
     if (cH.trim()) d.req_habilidades.push(cH.trim());
   }
 
-  // ── COMPETÊNCIAS TÉCNICAS (cols: x<185 nome | 185-490 desc | x≥490 grau) ──
-  if (iCompTec >= 0 && iCompComp > iCompTec)
-    d.comp_tecnicas = _parseComp3col(lines, iCompTec, iCompComp, 185, 490);
+  // Detecta limiar de coluna pelo cabeçalho "Competência | Descrição | Grau"
+  const _xCol = (fromIdx, label, def) => {
+    for (const l of lines.slice(fromIdx, Math.min(fromIdx+6, lines.length))) {
+      const it = l.items.find(i => _nPdf(i.text).startsWith(_nPdf(label).slice(0,5)));
+      if (it) return it.x;
+    }
+    return def;
+  };
 
-  // ── COMPETÊNCIAS COMPORTAMENTAIS (cols: x<490 nome | x≥490 grau) ──
+  // ── COMPETÊNCIAS TÉCNICAS ──
+  if (iCompTec >= 0 && iCompComp > iCompTec) {
+    const x2t = _xCol(iCompTec, 'Descri', 130);
+    const x3t = _xCol(iCompTec, 'Grau',   480);
+    d.comp_tecnicas = _parseComp3col(lines, iCompTec, iCompComp, x2t, x3t);
+  }
+
+  // ── COMPETÊNCIAS COMPORTAMENTAIS (cols: x<xGC nome | x≥xGC grau) ──
   if (iCompComp >= 0 && iCompOrg > iCompComp) {
+    const xGC = _xCol(iCompComp, 'Grau', 460);
     for (const l of lines.slice(iCompComp+2, iCompOrg)) {
       const n = _nPdf(l.text);
       if (n.includes('COMPETENCIA') || n === 'GRAU') continue;
-      const grau = parseInt(l.items.filter(i=>i.x>=490).map(i=>i.text).join(''));
-      const nome = l.items.filter(i=>i.x<490).map(i=>i.text).join(' ').trim();
+      const grau = parseInt(l.items.filter(i=>i.x>=xGC).map(i=>i.text).join(''));
+      const nome = l.items.filter(i=>i.x<xGC).map(i=>i.text).join(' ').trim();
       if (nome && grau>=1 && grau<=5) d.comp_comportamentais.push({nome, grau});
     }
   }
@@ -4948,17 +4961,19 @@ async function _parseCargoPDF(file) {
   // ── COMPETÊNCIAS ORGANIZACIONAIS ──
   if (iCompOrg >= 0) {
     const end = iInd > iCompOrg ? iInd : lines.length;
-    d.comp_organizacionais = _parseComp3col(lines, iCompOrg, end, 185, 490);
+    const x2o = _xCol(iCompOrg, 'Descri', 130);
+    const x3o = _xCol(iCompOrg, 'Grau',   480);
+    d.comp_organizacionais = _parseComp3col(lines, iCompOrg, end, x2o, x3o);
   }
 
   // ── INDICADORES ──
   if (iIndBeh >= 0) {
     const end = [iIndOrg,iIndPerf].filter(i=>i>iIndBeh).sort((a,b)=>a-b)[0]||lines.length;
-    d.ind_comportamentais = _parseInd2col(lines, iIndBeh, end);
+    d.ind_comportamentais = _parseInd2col(lines, iIndBeh, end, 130);
   }
   if (iIndOrg >= 0) {
     const end = iIndPerf > iIndOrg ? iIndPerf : lines.length;
-    d.ind_organizacionais = _parseInd2col(lines, iIndOrg, end);
+    d.ind_organizacionais = _parseInd2col(lines, iIndOrg, end, 130);
   }
   if (iIndPerf >= 0)
     d.ind_performance = lines.slice(iIndPerf+1).map(l=>l.text.trim()).filter(Boolean);
@@ -4967,34 +4982,45 @@ async function _parseCargoPDF(file) {
 }
 
 function _parseComp3col(lines, from, to, x2, x3) {
-  const res = []; let cur = null;
-  for (const l of lines.slice(from+2, to)) {
+  // Filtra cabeçalhos da seção/tabela
+  const slice = lines.slice(from+2, to).filter(l => {
     const n = _nPdf(l.text);
-    if (n.includes('COMPETENCIA') || n.includes('DESCRICAO') || n === 'GRAU') continue;
-    const c1 = l.items.filter(i=>i.x<x2).map(i=>i.text).join(' ').trim();
-    const c2 = l.items.filter(i=>i.x>=x2&&i.x<x3).map(i=>i.text).join(' ').trim();
-    const grau = parseInt(l.items.filter(i=>i.x>=x3).map(i=>i.text).join(''));
-    if (grau>=1 && grau<=5) {
-      if(cur) res.push(cur);
-      cur = {nome:c1, descricao:c2, grau};
-    } else if (cur) {
-      // linha de continuação — sempre acumula na descrição, nunca no nome
-      const cont = [c1, c2].filter(Boolean).join(' ');
-      if (cont) cur.descricao += (cur.descricao ? ' ' : '') + cont;
-    }
+    return !n.includes('COMPETENCIA') && !n.includes('DESCRICAO') && n !== 'GRAU';
+  });
+
+  // 1ª passagem: localizar índices de linhas que possuem grau (1-5)
+  const grauIdxs = [];
+  for (let i = 0; i < slice.length; i++) {
+    const g = parseInt(slice[i].items.filter(it => it.x >= x3).map(it => it.text).join(''));
+    if (g >= 1 && g <= 5) grauIdxs.push({i, g});
   }
-  if (cur) res.push(cur);
+
+  // 2ª passagem: para cada grau, coletar TODOS os c1 (nome) e c2 (desc) do intervalo
+  const res = [];
+  for (let gi = 0; gi < grauIdxs.length; gi++) {
+    const {i: gIdx, g: grau} = grauIdxs[gi];
+    const start = gi > 0 ? grauIdxs[gi-1].i + 1 : 0;
+    const end   = gi < grauIdxs.length - 1 ? grauIdxs[gi+1].i : slice.length;
+    let nome = '', desc = '';
+    for (const l of slice.slice(start, end)) {
+      const c1 = l.items.filter(it => it.x < x2).map(it => it.text).join(' ').trim();
+      const c2 = l.items.filter(it => it.x >= x2 && it.x < x3).map(it => it.text).join(' ').trim();
+      if (c1) nome += (nome ? ' ' : '') + c1;
+      if (c2) desc += (desc ? ' ' : '') + c2;
+    }
+    if (nome || desc) res.push({nome: nome.trim(), descricao: desc.trim(), grau});
+  }
   return res;
 }
 
-function _parseInd2col(lines, from, to) {
+function _parseInd2col(lines, from, to, xSplit) {
+  xSplit = xSplit || 130;
   const res = []; let cur = null;
   for (const l of lines.slice(from+1, to)) {
-    const c1 = l.items.filter(i=>i.x<200).map(i=>i.text).join(' ').trim();
-    const c2 = l.items.filter(i=>i.x>=200).map(i=>i.text).join(' ').trim();
+    const c1 = l.items.filter(i=>i.x<xSplit).map(i=>i.text).join(' ').trim();
+    const c2 = l.items.filter(i=>i.x>=xSplit).map(i=>i.text).join(' ').trim();
     if (c1 && c2) { if(cur) res.push(cur); cur={nome:c1,descricao:c2}; }
     else if (cur) {
-      // linha de continuação — sempre acumula na descrição
       const cont = [c1, c2].filter(Boolean).join(' ');
       if (cont) cur.descricao += (cur.descricao ? ' ' : '') + cont;
     }
