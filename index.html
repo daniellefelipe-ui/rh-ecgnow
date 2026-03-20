@@ -7,6 +7,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
@@ -200,6 +201,7 @@
         <button class="nav-item" onclick="showSection('enps',this)">💬 &nbsp;e-NPS</button>
         <button class="nav-item" onclick="showSection('esat',this)">⭐ &nbsp;e-SAT</button>
         <button class="nav-item" onclick="showSection('ferias',this)">🏖 &nbsp;Férias</button>
+        <button class="nav-item" onclick="showSection('cargos',this)">📄 &nbsp;Cargos</button>
       </nav>
     </div>
     <div class="sb-footer">
@@ -577,7 +579,162 @@
         <div id="ferWrap"><div class="empty-state">Selecione uma aba acima.</div></div>
       </div>
     </section>
+
+    <!-- ══ CARGOS ══════════════════════════════════════════ -->
+    <section class="page-section" id="sec-cargos">
+      <div class="page-header">
+        <h1>Cargos</h1>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input class="search-bar" type="text" id="cargosSearch" placeholder="Buscar cargo..." oninput="filterCargos()" style="width:220px">
+          <button class="btn btn-primary" onclick="openCargoModal()">+ Novo Cargo</button>
+        </div>
+      </div>
+      <div class="kpi-grid" id="cargosKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div class="card">
+        <div id="cargosListWrap"><div class="empty-state">Carregando...</div></div>
+      </div>
+      <div class="card" id="cargoDetalheCard" style="display:none;margin-top:16px">
+        <div class="card-header">
+          <span class="card-title" id="cargoDetalheTitle">Descrição do Cargo</span>
+          <div style="display:flex;gap:8px">
+            <a id="cargoDetalhePdfBtn" target="_blank" style="display:none" class="btn btn-outline btn-sm">📄 Ver PDF</a>
+            <button class="btn btn-sm btn-outline" id="cargoDetalheEditBtn" onclick="">✏️ Editar</button>
+            <button class="btn btn-sm btn-outline" onclick="document.getElementById('cargoDetalheCard').style.display='none'">Fechar</button>
+          </div>
+        </div>
+        <div id="cargoDetalheWrap" style="padding:8px 0"></div>
+      </div>
+    </section>
   </main>
+</div>
+
+<!-- MODAL CARGO -->
+<div class="modal-overlay" id="cargoModal">
+  <div class="modal" style="width:820px;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <span class="modal-title" id="cargoModalTitle">Novo Cargo</span>
+      <button class="modal-close" onclick="closeCargoModal()">×</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:20px 24px">
+      <input type="hidden" id="cargoId">
+
+      <!-- IDENTIFICAÇÃO -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-weight:700;color:#0b4e7d;margin-bottom:12px;font-size:13px;text-transform:uppercase;letter-spacing:.5px">Identificação</div>
+        <div class="form-grid">
+          <div class="form-group full"><label class="form-label">Título do Cargo *</label>
+            <input type="text" class="form-input" id="cargoTitulo" placeholder="Ex: Analista de Suporte"></div>
+          <div class="form-group"><label class="form-label">Cargo Superior Imediato</label>
+            <input type="text" class="form-input" id="cargoSuperior" placeholder="Ex: Líder de Customer Success"></div>
+          <div class="form-group"><label class="form-label">Cargos Subordinados</label>
+            <input type="text" class="form-input" id="cargoSubordinados" placeholder="Ex: — ou lista de cargos"></div>
+        </div>
+      </div>
+
+      <!-- MISSÃO -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-weight:700;color:#0b4e7d;margin-bottom:12px;font-size:13px;text-transform:uppercase;letter-spacing:.5px">Missão do Cargo</div>
+        <textarea class="form-input" id="cargoMissao" rows="5" placeholder="Descreva a missão principal do cargo..." style="resize:vertical"></textarea>
+      </div>
+
+      <!-- RESPONSABILIDADES -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-weight:700;color:#0b4e7d;font-size:13px;text-transform:uppercase;letter-spacing:.5px">Principais Responsabilidades <span style="font-weight:400;font-size:11px;color:#94a3b8">(O QUE, COMO, PRA QUE, QUANDO)</span></div>
+          <button type="button" class="btn btn-sm btn-outline" onclick="cargoAddRow('respRows','resp')">+ Adicionar</button>
+        </div>
+        <div id="respRows"></div>
+      </div>
+
+      <!-- REQUISITOS -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-weight:700;color:#0b4e7d;margin-bottom:12px;font-size:13px;text-transform:uppercase;letter-spacing:.5px">Requisitos</div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Conhecimentos</label>
+            <textarea class="form-input" id="cargoReqConhec" rows="5" placeholder="Um por linha..." style="resize:vertical"></textarea></div>
+          <div class="form-group"><label class="form-label">Habilidades</label>
+            <textarea class="form-input" id="cargoReqHabil" rows="5" placeholder="Uma por linha..." style="resize:vertical"></textarea></div>
+        </div>
+      </div>
+
+      <!-- COMPETÊNCIAS TÉCNICAS -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-weight:700;color:#0b4e7d;font-size:13px;text-transform:uppercase;letter-spacing:.5px">Competências Técnicas</div>
+          <button type="button" class="btn btn-sm btn-outline" onclick="cargoAddRow('compTecRows','compTec')">+ Adicionar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 2fr 80px 32px;gap:6px;font-size:11px;font-weight:600;color:#64748b;padding:0 4px;margin-bottom:4px">
+          <span>Competência</span><span>Descrição</span><span style="text-align:center">Grau (1-5)</span><span></span></div>
+        <div id="compTecRows"></div>
+      </div>
+
+      <!-- COMPETÊNCIAS COMPORTAMENTAIS -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-weight:700;color:#0b4e7d;font-size:13px;text-transform:uppercase;letter-spacing:.5px">Competências Comportamentais</div>
+          <button type="button" class="btn btn-sm btn-outline" onclick="cargoAddRow('compCompRows','compComp')">+ Adicionar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 80px 32px;gap:6px;font-size:11px;font-weight:600;color:#64748b;padding:0 4px;margin-bottom:4px">
+          <span>Competência</span><span style="text-align:center">Grau (1-5)</span><span></span></div>
+        <div id="compCompRows"></div>
+      </div>
+
+      <!-- COMPETÊNCIAS ORGANIZACIONAIS -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-weight:700;color:#0b4e7d;font-size:13px;text-transform:uppercase;letter-spacing:.5px">Competências Organizacionais</div>
+          <button type="button" class="btn btn-sm btn-outline" onclick="cargoAddRow('compOrgRows','compOrg')">+ Adicionar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 2fr 80px 32px;gap:6px;font-size:11px;font-weight:600;color:#64748b;padding:0 4px;margin-bottom:4px">
+          <span>Competência</span><span>Descrição</span><span style="text-align:center">Grau (1-5)</span><span></span></div>
+        <div id="compOrgRows"></div>
+      </div>
+
+      <!-- INDICADORES -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-weight:700;color:#0b4e7d;margin-bottom:12px;font-size:13px;text-transform:uppercase;letter-spacing:.5px">Indicadores</div>
+
+        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px">Competências Comportamentais
+          <button type="button" class="btn btn-sm btn-outline" style="margin-left:12px" onclick="cargoAddRow('indCompRows','indComp')">+ Adicionar</button></div>
+        <div style="display:grid;grid-template-columns:1fr 2fr 32px;gap:6px;font-size:11px;font-weight:600;color:#64748b;padding:0 4px;margin-bottom:4px">
+          <span>Competência</span><span>Como medir</span><span></span></div>
+        <div id="indCompRows" style="margin-bottom:16px"></div>
+
+        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px">Competências Organizacionais
+          <button type="button" class="btn btn-sm btn-outline" style="margin-left:12px" onclick="cargoAddRow('indOrgRows','indOrg')">+ Adicionar</button></div>
+        <div style="display:grid;grid-template-columns:1fr 2fr 32px;gap:6px;font-size:11px;font-weight:600;color:#64748b;padding:0 4px;margin-bottom:4px">
+          <span>Competência</span><span>Como medir</span><span></span></div>
+        <div id="indOrgRows" style="margin-bottom:16px"></div>
+
+        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px">Indicadores de Performance</div>
+        <textarea class="form-input" id="cargoIndPerf" rows="4" placeholder="Um por linha (ex: Taxa de Resolução no Primeiro Contato)" style="resize:vertical"></textarea>
+      </div>
+
+      <!-- PDF -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:8px">
+        <div style="font-weight:700;color:#0b4e7d;margin-bottom:12px;font-size:13px;text-transform:uppercase;letter-spacing:.5px">PDF da Descrição de Cargo</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('cargoPdfInput').click()">📎 Selecionar PDF</button>
+          <input type="file" id="cargoPdfInput" accept=".pdf" style="display:none" onchange="onCargoPdfSelect(this)">
+          <span id="cargoPdfNome" style="font-size:13px;color:#64748b">Nenhum arquivo selecionado</span>
+          <a id="cargoPdfAtualLink" target="_blank" style="display:none;font-size:12px;color:#1a8fe3">📄 Ver PDF atual</a>
+        </div>
+        <div id="cargoPdfProgress" style="display:none;margin-top:10px">
+          <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+            <div id="cargoPdfBar" style="height:100%;background:#1a8fe3;width:0%;transition:width .3s"></div>
+          </div>
+          <span id="cargoPdfPct" style="font-size:11px;color:#64748b">Enviando...</span>
+        </div>
+      </div>
+    </div>
+    <div class="form-actions" style="flex-shrink:0;border-top:1px solid #e2e8f0;padding:14px 24px;margin:0">
+      <button class="btn btn-outline" onclick="closeCargoModal()">Cancelar</button>
+      <button class="btn btn-danger" id="cargoDeleteBtn" style="display:none" onclick="deleteCargoFromModal()">Excluir</button>
+      <button class="btn btn-primary" onclick="saveCargo()">Salvar</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL FINANCEIRO -->
@@ -1224,8 +1381,9 @@ firebase.initializeApp({
   messagingSenderId: "130728187614",
   appId: "1:130728187614:web:bb1fb39b10be2119c7d44f"
 });
-const auth = firebase.auth();
-const db   = firebase.firestore();
+const auth    = firebase.auth();
+const db      = firebase.firestore();
+const storage = firebase.storage();
 
 // ── Auth ──────────────────────────────────────────────────
 auth.onAuthStateChanged(user => {
@@ -1430,6 +1588,7 @@ async function loadAll() {
   await loadEnps();
   await loadEsat();
   await loadFerias();
+  await loadCargos();
   buildDashboard();
 }
 
@@ -4456,6 +4615,271 @@ function buildDashboard() {
     options:{ plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:10, padding:10 } } },
       scales:{ y:{ position:'left', ticks:{callback:v=>v+'%',font:{size:10}} }, y2:{ position:'right', grid:{drawOnChartArea:false}, ticks:{stepSize:1,font:{size:10}} } } }
   });
+}
+
+// ══ CARGOS ══════════════════════════════════════════════
+let allCargos = [], _cargoEditId = null, _cargoPdfFile = null;
+
+async function loadCargos() {
+  try {
+    const snap = await db.collection('cargos').orderBy('titulo').get();
+    allCargos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderCargosList(allCargos);
+    renderCargosKpis();
+  } catch(e) { console.error('loadCargos', e); }
+}
+
+function renderCargosKpis() {
+  const comPdf = allCargos.filter(c => c.pdf_url).length;
+  document.getElementById('cargosKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">Total de Cargos</div><div class="kpi-val">${allCargos.length}</div><div class="kpi-sub">cadastrados</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Com PDF</div><div class="kpi-val">${comPdf}</div><div class="kpi-sub">descrições em PDF</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Sem PDF</div><div class="kpi-val">${allCargos.length - comPdf}</div><div class="kpi-sub">aguardando upload</div></div>`;
+}
+
+function renderCargosList(lista) {
+  const wrap = document.getElementById('cargosListWrap');
+  if (!lista.length) { wrap.innerHTML = '<div class="empty-state">Nenhum cargo cadastrado.<br><small>Clique em "+ Novo Cargo" para começar.</small></div>'; return; }
+  wrap.innerHTML = `<table class="table"><thead><tr>
+    <th>Título do Cargo</th><th>Cargo Superior</th><th style="text-align:center">PDF</th><th>Comp. Técnicas</th><th>Comp. Comportamentais</th><th></th>
+  </tr></thead><tbody>${lista.map(c => `<tr>
+    <td><strong style="color:#1a2535">${c.titulo||'—'}</strong></td>
+    <td style="font-size:12px;color:#64748b">${c.cargo_superior||'—'}</td>
+    <td style="text-align:center">${c.pdf_url ? `<a href="${c.pdf_url}" target="_blank" class="badge badge-green" style="text-decoration:none">📄 PDF</a>` : '<span class="badge badge-orange">Sem PDF</span>'}</td>
+    <td style="font-size:12px">${(c.comp_tecnicas||[]).length} item(s)</td>
+    <td style="font-size:12px">${(c.comp_comportamentais||[]).length} item(s)</td>
+    <td><div style="display:flex;gap:6px">
+      <button class="btn btn-sm btn-primary" onclick='verCargo("${c.id}")'>Ver Detalhes</button>
+      <button class="btn btn-sm btn-outline" onclick='openCargoModal("${c.id}")'>Editar</button>
+    </div></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+function filterCargos() {
+  const q = document.getElementById('cargosSearch').value.toLowerCase();
+  renderCargosList(allCargos.filter(c => (c.titulo||'').toLowerCase().includes(q) || (c.cargo_superior||'').toLowerCase().includes(q)));
+}
+
+// ─── DETALHE ──────────────────────────────────────────
+function verCargo(id) {
+  const c = allCargos.find(x => x.id === id); if (!c) return;
+  document.getElementById('cargoDetalheTitle').textContent = c.titulo || 'Descrição do Cargo';
+  const pdfBtn = document.getElementById('cargoDetalhePdfBtn');
+  if (c.pdf_url) { pdfBtn.href = c.pdf_url; pdfBtn.style.display = ''; } else { pdfBtn.style.display = 'none'; }
+  document.getElementById('cargoDetalheEditBtn').setAttribute('onclick', `openCargoModal("${id}")`);
+
+  const grauDots = g => Array.from({length:5},(_,i)=>`<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:2px;background:${i<g?'#0b4e7d':'#e2e8f0'}"></span>`).join('');
+  const section = (title, content) => `<div style="margin-bottom:20px"><div style="font-weight:700;color:#0b4e7d;font-size:12px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0;padding-bottom:6px;margin-bottom:10px">${title}</div>${content}</div>`;
+  const tabelaCabec = (cols) => `<div style="display:grid;grid-template-columns:${cols};gap:6px;font-size:11px;font-weight:700;color:#64748b;padding:6px 8px;background:#f1f5f9;border-radius:4px;margin-bottom:4px">`;
+
+  let html = '';
+
+  // Identificação
+  html += section('Identificação', `<div class="form-grid">
+    <div class="form-group"><label class="form-label">Título</label><div style="font-size:13px;color:#1a2535;font-weight:600">${c.titulo||'—'}</div></div>
+    <div class="form-group"><label class="form-label">Cargo Superior</label><div style="font-size:13px">${c.cargo_superior||'—'}</div></div>
+    <div class="form-group full"><label class="form-label">Cargos Subordinados</label><div style="font-size:13px">${c.cargos_subordinados||'—'}</div></div>
+  </div>`);
+
+  // Missão
+  if (c.missao) html += section('Missão do Cargo', `<p style="font-size:13px;line-height:1.7;color:#334155;text-align:justify">${c.missao}</p>`);
+
+  // Responsabilidades
+  if ((c.responsabilidades||[]).length) html += section('Principais Responsabilidades <span style="font-size:10px;font-weight:400">(O QUE, COMO, PRA QUE, QUANDO)</span>',
+    (c.responsabilidades).map((r,i) => `<div style="font-size:13px;line-height:1.6;color:#334155;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:6px;border-left:3px solid #1a8fe3"><strong>${i+1}.</strong> ${r}</div>`).join(''));
+
+  // Requisitos
+  const rConhec = (c.req_conhecimentos||[]).filter(Boolean);
+  const rHabil  = (c.req_habilidades||[]).filter(Boolean);
+  if (rConhec.length || rHabil.length) html += section('Requisitos', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div><div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px">Conhecimentos</div>${rConhec.map(r=>`<div style="font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;color:#334155">${r}</div>`).join('')}</div>
+    <div><div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px">Habilidades</div>${rHabil.map(r=>`<div style="font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;color:#334155">${r}</div>`).join('')}</div>
+  </div>`);
+
+  // Comp. Técnicas
+  if ((c.comp_tecnicas||[]).length) html += section('Competências Técnicas', `
+    ${tabelaCabec('1fr 2fr 100px')}<span>Competência</span><span>Descrição</span><span style="text-align:center">Grau</span></div>
+    ${c.comp_tecnicas.map(t=>`<div style="display:grid;grid-template-columns:1fr 2fr 100px;gap:6px;padding:8px;border-bottom:1px solid #f1f5f9;font-size:12px;align-items:center">
+      <span style="font-weight:600;color:#1a2535">${t.nome}</span><span style="color:#475569">${t.descricao||''}</span><span style="text-align:center">${grauDots(t.grau||0)}</span></div>`).join('')}`);
+
+  // Comp. Comportamentais
+  if ((c.comp_comportamentais||[]).length) html += section('Competências Comportamentais', `
+    ${tabelaCabec('1fr 120px')}<span>Competência</span><span style="text-align:center">Grau</span></div>
+    ${c.comp_comportamentais.map(t=>`<div style="display:grid;grid-template-columns:1fr 120px;gap:6px;padding:8px;border-bottom:1px solid #f1f5f9;font-size:12px;align-items:center">
+      <span style="font-weight:600;color:#1a2535">${t.nome}</span><span style="text-align:center">${grauDots(t.grau||0)}</span></div>`).join('')}`);
+
+  // Comp. Organizacionais
+  if ((c.comp_organizacionais||[]).length) html += section('Competências Organizacionais', `
+    ${tabelaCabec('1fr 2fr 100px')}<span>Competência</span><span>Descrição</span><span style="text-align:center">Grau</span></div>
+    ${c.comp_organizacionais.map(t=>`<div style="display:grid;grid-template-columns:1fr 2fr 100px;gap:6px;padding:8px;border-bottom:1px solid #f1f5f9;font-size:12px;align-items:center">
+      <span style="font-weight:600;color:#1a2535">${t.nome}</span><span style="color:#475569">${t.descricao||''}</span><span style="text-align:center">${grauDots(t.grau||0)}</span></div>`).join('')}`);
+
+  // Indicadores
+  const iComp = (c.ind_comportamentais||[]).filter(x=>x.nome);
+  const iOrg  = (c.ind_organizacionais||[]).filter(x=>x.nome);
+  const iPerf = (c.ind_performance||[]).filter(Boolean);
+  if (iComp.length || iOrg.length || iPerf.length) {
+    let indHtml = '';
+    if (iComp.length) indHtml += `<div style="font-size:12px;font-weight:600;color:#475569;margin:10px 0 6px">Competências Comportamentais</div>
+      ${iComp.map(x=>`<div style="display:grid;grid-template-columns:1fr 2fr;gap:6px;padding:8px;border-bottom:1px solid #f1f5f9;font-size:12px"><span style="font-weight:600;color:#1a2535">${x.nome}</span><span style="color:#475569">${x.descricao||''}</span></div>`).join('')}`;
+    if (iOrg.length) indHtml += `<div style="font-size:12px;font-weight:600;color:#475569;margin:10px 0 6px">Competências Organizacionais</div>
+      ${iOrg.map(x=>`<div style="display:grid;grid-template-columns:1fr 2fr;gap:6px;padding:8px;border-bottom:1px solid #f1f5f9;font-size:12px"><span style="font-weight:600;color:#1a2535">${x.nome}</span><span style="color:#475569">${x.descricao||''}</span></div>`).join('')}`;
+    if (iPerf.length) indHtml += `<div style="font-size:12px;font-weight:600;color:#475569;margin:10px 0 6px">Indicadores de Performance</div>
+      ${iPerf.map(x=>`<div style="padding:6px 8px;font-size:13px;border-bottom:1px solid #f1f5f9;color:#334155">• ${x}</div>`).join('')}`;
+    html += section('Indicadores', indHtml);
+  }
+
+  document.getElementById('cargoDetalheWrap').innerHTML = html;
+  const card = document.getElementById('cargoDetalheCard');
+  card.style.display = '';
+  card.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ─── MODAL helpers ────────────────────────────────────
+const _grauSel = (v) => [1,2,3,4,5].map(n=>`<option value="${n}" ${n==v?'selected':''}>${n}</option>`).join('');
+
+function cargoAddRow(containerId, tipo, data={}) {
+  const wrap = document.getElementById(containerId);
+  const div  = document.createElement('div');
+  const rowStyle = 'display:flex;gap:6px;align-items:flex-start;margin-bottom:6px';
+  const removeBtn = `<button type="button" onclick="this.closest('div').remove()" style="background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer;padding:2px 4px;flex-shrink:0">×</button>`;
+
+  if (tipo === 'resp') {
+    div.innerHTML = `<div style="${rowStyle}">
+      <textarea class="form-input cargo-resp" rows="3" placeholder="Descreva a responsabilidade..." style="resize:vertical">${data.texto||''}</textarea>${removeBtn}</div>`;
+  } else if (tipo === 'compTec' || tipo === 'compOrg') {
+    div.innerHTML = `<div style="${rowStyle}">
+      <input type="text" class="form-input cargo-nome" placeholder="Competência" value="${data.nome||''}" style="flex:1">
+      <textarea class="form-input cargo-desc" rows="2" placeholder="Descrição" style="flex:2;resize:vertical">${data.descricao||''}</textarea>
+      <select class="form-select cargo-grau" style="width:70px">${_grauSel(data.grau||1)}</select>${removeBtn}</div>`;
+  } else if (tipo === 'compComp') {
+    div.innerHTML = `<div style="${rowStyle}">
+      <input type="text" class="form-input cargo-nome" placeholder="Competência" value="${data.nome||''}" style="flex:1">
+      <select class="form-select cargo-grau" style="width:70px">${_grauSel(data.grau||1)}</select>${removeBtn}</div>`;
+  } else if (tipo === 'indComp' || tipo === 'indOrg') {
+    div.innerHTML = `<div style="${rowStyle}">
+      <input type="text" class="form-input cargo-nome" placeholder="Competência" value="${data.nome||''}" style="flex:1">
+      <textarea class="form-input cargo-desc" rows="2" placeholder="Como medir..." style="flex:2;resize:vertical">${data.descricao||''}</textarea>${removeBtn}</div>`;
+  }
+  wrap.appendChild(div);
+}
+
+function _clearCargoModal() {
+  ['respRows','compTecRows','compCompRows','compOrgRows','indCompRows','indOrgRows'].forEach(id => document.getElementById(id).innerHTML = '');
+  ['cargoTitulo','cargoSuperior','cargoSubordinados','cargoMissao','cargoReqConhec','cargoReqHabil','cargoIndPerf'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('cargoPdfNome').textContent = 'Nenhum arquivo selecionado';
+  document.getElementById('cargoPdfAtualLink').style.display = 'none';
+  document.getElementById('cargoPdfProgress').style.display = 'none';
+  document.getElementById('cargoDeleteBtn').style.display = 'none';
+  _cargoPdfFile = null;
+}
+
+function openCargoModal(id) {
+  _clearCargoModal();
+  _cargoEditId = id || null;
+  document.getElementById('cargoModalTitle').textContent = id ? 'Editar Cargo' : 'Novo Cargo';
+
+  if (id) {
+    const c = allCargos.find(x => x.id === id); if (!c) return;
+    document.getElementById('cargoTitulo').value       = c.titulo||'';
+    document.getElementById('cargoSuperior').value     = c.cargo_superior||'';
+    document.getElementById('cargoSubordinados').value = c.cargos_subordinados||'';
+    document.getElementById('cargoMissao').value       = c.missao||'';
+    document.getElementById('cargoReqConhec').value    = (c.req_conhecimentos||[]).join('\n');
+    document.getElementById('cargoReqHabil').value     = (c.req_habilidades||[]).join('\n');
+    document.getElementById('cargoIndPerf').value      = (c.ind_performance||[]).join('\n');
+    (c.responsabilidades||[]).forEach(t => cargoAddRow('respRows','resp',{texto:t}));
+    (c.comp_tecnicas||[]).forEach(t => cargoAddRow('compTecRows','compTec',t));
+    (c.comp_comportamentais||[]).forEach(t => cargoAddRow('compCompRows','compComp',t));
+    (c.comp_organizacionais||[]).forEach(t => cargoAddRow('compOrgRows','compOrg',t));
+    (c.ind_comportamentais||[]).forEach(t => cargoAddRow('indCompRows','indComp',t));
+    (c.ind_organizacionais||[]).forEach(t => cargoAddRow('indOrgRows','indOrg',t));
+    if (c.pdf_url) { const lnk = document.getElementById('cargoPdfAtualLink'); lnk.href = c.pdf_url; lnk.textContent = '📄 '+( c.pdf_nome||'Ver PDF atual'); lnk.style.display = ''; }
+    document.getElementById('cargoDeleteBtn').style.display = '';
+  }
+  document.getElementById('cargoModal').classList.add('open');
+}
+
+function closeCargoModal() { document.getElementById('cargoModal').classList.remove('open'); }
+
+function onCargoPdfSelect(input) {
+  _cargoPdfFile = input.files[0] || null;
+  document.getElementById('cargoPdfNome').textContent = _cargoPdfFile ? _cargoPdfFile.name : 'Nenhum arquivo selecionado';
+  input.value = '';
+}
+
+function _readCargoRows(containerId, tipo) {
+  return [...document.querySelectorAll(`#${containerId} > div`)].map(row => {
+    const nome  = row.querySelector('.cargo-nome')?.value?.trim() || '';
+    const desc  = row.querySelector('.cargo-desc')?.value?.trim() || '';
+    const grau  = parseInt(row.querySelector('.cargo-grau')?.value) || 1;
+    const texto = row.querySelector('.cargo-resp')?.value?.trim() || '';
+    if (tipo === 'resp')    return texto || null;
+    if (tipo === 'compComp') return nome ? {nome, grau} : null;
+    if (tipo === 'compTec' || tipo === 'compOrg') return nome ? {nome, descricao:desc, grau} : null;
+    if (tipo === 'indComp' || tipo === 'indOrg')  return nome ? {nome, descricao:desc} : null;
+    return null;
+  }).filter(Boolean);
+}
+
+async function saveCargo() {
+  const titulo = document.getElementById('cargoTitulo').value.trim();
+  if (!titulo) { toast('Informe o título do cargo','e'); return; }
+
+  const payload = {
+    titulo,
+    cargo_superior:      document.getElementById('cargoSuperior').value.trim(),
+    cargos_subordinados: document.getElementById('cargoSubordinados').value.trim(),
+    missao:              document.getElementById('cargoMissao').value.trim(),
+    responsabilidades:   _readCargoRows('respRows','resp'),
+    req_conhecimentos:   document.getElementById('cargoReqConhec').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    req_habilidades:     document.getElementById('cargoReqHabil').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    comp_tecnicas:       _readCargoRows('compTecRows','compTec'),
+    comp_comportamentais:_readCargoRows('compCompRows','compComp'),
+    comp_organizacionais:_readCargoRows('compOrgRows','compOrg'),
+    ind_comportamentais: _readCargoRows('indCompRows','indComp'),
+    ind_organizacionais: _readCargoRows('indOrgRows','indOrg'),
+    ind_performance:     document.getElementById('cargoIndPerf').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    atualizado_em:       firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  if (!_cargoEditId) payload.criado_em = firebase.firestore.FieldValue.serverTimestamp();
+
+  // PDF upload
+  if (_cargoPdfFile) {
+    try {
+      document.getElementById('cargoPdfProgress').style.display = '';
+      const ref  = storage.ref(`cargos-pdf/${Date.now()}_${_cargoPdfFile.name}`);
+      const task = ref.put(_cargoPdfFile);
+      await new Promise((res, rej) => {
+        task.on('state_changed',
+          snap => { const pct = Math.round(snap.bytesTransferred/snap.totalBytes*100);
+            document.getElementById('cargoPdfBar').style.width = pct+'%';
+            document.getElementById('cargoPdfPct').textContent = pct+'% enviado...'; },
+          rej, res);
+      });
+      payload.pdf_url  = await ref.getDownloadURL();
+      payload.pdf_nome = _cargoPdfFile.name;
+    } catch(e) { toast('Erro no upload do PDF: '+e.message,'e'); document.getElementById('cargoPdfProgress').style.display='none'; return; }
+  }
+
+  try {
+    if (_cargoEditId) await db.collection('cargos').doc(_cargoEditId).update(payload);
+    else              await db.collection('cargos').add(payload);
+    toast(_cargoEditId ? 'Cargo atualizado!' : 'Cargo cadastrado!');
+    closeCargoModal();
+    await loadCargos();
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+async function deleteCargoFromModal() {
+  if (!_cargoEditId || !confirm('Excluir este cargo?')) return;
+  try {
+    await db.collection('cargos').doc(_cargoEditId).delete();
+    toast('Cargo excluído.');
+    closeCargoModal();
+    document.getElementById('cargoDetalheCard').style.display = 'none';
+    await loadCargos();
+  } catch(e) { toast('Erro: '+e.message,'e'); }
 }
 </script>
 </body>
