@@ -4902,10 +4902,15 @@ async function _parseCargoPDF(file) {
   if (iResp >= 0) {
     const end = [iReq,iCompTec].filter(i=>i>iResp).sort((a,b)=>a-b)[0] || lines.length;
     let cur = '';
-    for (const l of lines.slice(iResp+2, end)) {
-      const t = l.text.trim(); if (!t || _nPdf(t).startsWith('(DESCRICAO')) continue;
-      if (/^\d+\./.test(t)) { if(cur) d.responsabilidades.push(cur.trim()); cur=t; }
-      else cur += ' '+t;
+    for (const l of lines.slice(iResp+1, end)) {
+      const t = l.text.trim(); if (!t) continue;
+      const n = _nPdf(t);
+      // pula cabeçalhos de seção/tabela
+      if (n.startsWith('(DESCRICAO') || n.startsWith('NO ') || n === 'N°' || n === 'Nº' ||
+          (n.includes('RESPONSABILIDADE') && t.length < 35)) continue;
+      if (/^\d+\s*[.)]\s/.test(t) || /^\d+\s+[A-ZÁÉÍÓÚ]/.test(t)) {
+        if(cur) d.responsabilidades.push(cur.trim()); cur=t;
+      } else if (cur) cur += ' '+t;
     }
     if (cur.trim()) d.responsabilidades.push(cur.trim());
   }
@@ -4969,8 +4974,14 @@ function _parseComp3col(lines, from, to, x2, x3) {
     const c1 = l.items.filter(i=>i.x<x2).map(i=>i.text).join(' ').trim();
     const c2 = l.items.filter(i=>i.x>=x2&&i.x<x3).map(i=>i.text).join(' ').trim();
     const grau = parseInt(l.items.filter(i=>i.x>=x3).map(i=>i.text).join(''));
-    if (c1 && grau>=1 && grau<=5) { if(cur) res.push(cur); cur={nome:c1,descricao:c2,grau}; }
-    else if (cur) { if(c1) cur.nome+=' '+c1; if(c2) cur.descricao+=(cur.descricao?' ':'')+c2; if(grau>=1&&grau<=5&&!cur.grau) cur.grau=grau; }
+    if (grau>=1 && grau<=5) {
+      if(cur) res.push(cur);
+      cur = {nome:c1, descricao:c2, grau};
+    } else if (cur) {
+      // linha de continuação — sempre acumula na descrição, nunca no nome
+      const cont = [c1, c2].filter(Boolean).join(' ');
+      if (cont) cur.descricao += (cur.descricao ? ' ' : '') + cont;
+    }
   }
   if (cur) res.push(cur);
   return res;
@@ -4982,8 +4993,11 @@ function _parseInd2col(lines, from, to) {
     const c1 = l.items.filter(i=>i.x<200).map(i=>i.text).join(' ').trim();
     const c2 = l.items.filter(i=>i.x>=200).map(i=>i.text).join(' ').trim();
     if (c1 && c2) { if(cur) res.push(cur); cur={nome:c1,descricao:c2}; }
-    else if (c1 && cur) cur.nome+=' '+c1;
-    else if (c2 && cur) cur.descricao+=' '+c2;
+    else if (cur) {
+      // linha de continuação — sempre acumula na descrição
+      const cont = [c1, c2].filter(Boolean).join(' ');
+      if (cont) cur.descricao += (cur.descricao ? ' ' : '') + cont;
+    }
   }
   if (cur) res.push(cur);
   return res;
