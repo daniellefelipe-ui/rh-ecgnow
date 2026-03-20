@@ -5056,10 +5056,12 @@ async function saveCargo() {
   };
   if (!_cargoEditId) payload.criado_em = firebase.firestore.FieldValue.serverTimestamp();
 
-  // PDF upload
+  // PDF upload (opcional — salva cargo mesmo se upload falhar)
   if (_cargoPdfFile) {
     try {
       document.getElementById('cargoPdfProgress').style.display = '';
+      document.getElementById('cargoPdfBar').style.width = '0%';
+      document.getElementById('cargoPdfPct').textContent = 'Enviando...';
       const ref  = storage.ref(`cargos-pdf/${Date.now()}_${_cargoPdfFile.name}`);
       const task = ref.put(_cargoPdfFile);
       await new Promise((res, rej) => {
@@ -5071,7 +5073,12 @@ async function saveCargo() {
       });
       payload.pdf_url  = await ref.getDownloadURL();
       payload.pdf_nome = _cargoPdfFile.name;
-    } catch(e) { toast('Erro no upload do PDF: '+e.message,'e'); document.getElementById('cargoPdfProgress').style.display='none'; return; }
+    } catch(e) {
+      console.warn('Upload PDF falhou, salvando sem arquivo:', e.message);
+      toast('Aviso: PDF não enviado, cargo salvo sem arquivo.', 'e');
+    } finally {
+      document.getElementById('cargoPdfProgress').style.display = 'none';
+    }
   }
 
   try {
