@@ -716,7 +716,7 @@
       <div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:8px">
         <div style="font-weight:700;color:#0b4e7d;margin-bottom:12px;font-size:13px;text-transform:uppercase;letter-spacing:.5px">PDF da Descrição de Cargo</div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button type="button" class="btn btn-outline" onclick="document.getElementById('cargoPdfInput').click()">📎 Selecionar PDF</button>
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('cargoPdfInput').click()">📥 Importar do PDF</button>
           <input type="file" id="cargoPdfInput" accept=".pdf" style="display:none" onchange="onCargoPdfSelect(this)">
           <span id="cargoPdfNome" style="font-size:13px;color:#64748b">Nenhum arquivo selecionado</span>
           <a id="cargoPdfAtualLink" target="_blank" style="display:none;font-size:12px;color:#1a8fe3">📄 Ver PDF atual</a>
@@ -4802,10 +4802,208 @@ function openCargoModal(id) {
 
 function closeCargoModal() { document.getElementById('cargoModal').classList.remove('open'); }
 
-function onCargoPdfSelect(input) {
+async function onCargoPdfSelect(input) {
   _cargoPdfFile = input.files[0] || null;
-  document.getElementById('cargoPdfNome').textContent = _cargoPdfFile ? _cargoPdfFile.name : 'Nenhum arquivo selecionado';
   input.value = '';
+  if (!_cargoPdfFile) return;
+  document.getElementById('cargoPdfNome').textContent = '⏳ Lendo ' + _cargoPdfFile.name + '...';
+  try {
+    const dados = await _parseCargoPDF(_cargoPdfFile);
+    _fillCargoModal(dados);
+    document.getElementById('cargoPdfNome').textContent = '✅ ' + _cargoPdfFile.name;
+    toast('PDF importado! Verifique os dados e salve.');
+  } catch(e) {
+    console.error('PDF parse:', e);
+    document.getElementById('cargoPdfNome').textContent = _cargoPdfFile.name;
+    toast('Erro ao ler PDF. Preencha manualmente.', 'e');
+  }
+}
+
+const _nPdf = s => String(s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+
+async function _parseCargoPDF(file) {
+  if (!window.pdfjsLib) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+
+  let items = []; let yOff = 0;
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const vp   = page.getViewport({scale: 1});
+    const tc   = await page.getTextContent();
+    tc.items.forEach(it => {
+      const s = it.str.trim(); if (!s) return;
+      items.push({ text:s, x:Math.round(it.transform[4]), y:Math.round(yOff + vp.height - it.transform[5]) });
+    });
+    yOff += vp.height + 10;
+  }
+  items.sort((a,b) => a.y - b.y || a.x - b.x);
+
+  // Agrupar em linhas (tolerância 4pt no eixo Y)
+  const lines = [];
+  for (const it of items) {
+    const last = lines[lines.length-1];
+    if (last && Math.abs(it.y - last.y) <= 4) { last.items.push(it); }
+    else { lines.push({y:it.y, items:[it]}); }
+  }
+  lines.forEach(l => { l.items.sort((a,b)=>a.x-b.x); l.text = l.items.map(i=>i.text).join(' '); });
+
+  const fi = phrase => lines.findIndex(l => _nPdf(l.text).includes(_nPdf(phrase)));
+  const cols = (l, ...xs) => {
+    const bands = [];
+    for (let i=0; i<xs.length-1; i++)
+      bands.push(l.items.filter(it=>it.x>=xs[i]&&it.x<xs[i+1]).map(i=>i.text).join(' ').trim());
+    bands.push(l.items.filter(it=>it.x>=xs[xs.length-1]).map(i=>i.text).join(' ').trim());
+    return bands;
+  };
+
+  const iMissao   = fi('MISSÃO DO CARGO');
+  const iResp     = fi('PRINCIPAIS RESPONSABILIDADES');
+  const iReq      = fi('REQUISITOS');
+  const iCompTec  = fi('COMPETÊNCIAS TÉCNICAS');
+  const iCompComp = fi('COMPETÊNCIAS COMPORTAMENTAIS');
+  const iCompOrg  = fi('COMPETÊNCIAS ORGANIZACIONAIS');
+  const iInd      = fi('INDICADORES');
+  const iIndBeh   = fi('Indicadores de Competências Comportamentais');
+  const iIndOrg   = fi('Indicadores de Competências Organizacionais');
+  const iIndPerf  = fi('Indicadores de Performance');
+
+  const d = {
+    titulo:'', cargo_superior:'', cargos_subordinados:'—', missao:'',
+    responsabilidades:[], req_conhecimentos:[], req_habilidades:[],
+    comp_tecnicas:[], comp_comportamentais:[], comp_organizacionais:[],
+    ind_comportamentais:[], ind_organizacionais:[], ind_performance:[]
+  };
+
+  // ── IDENTIFICAÇÃO ──
+  for (const l of lines.slice(0, iMissao > 0 ? iMissao : 8)) {
+    const n = _nPdf(l.text);
+    const v = l.items.filter(i=>i.x>200).map(i=>i.text).join(' ').trim();
+    if (n.includes('TITULO DO CARGO') && !n.includes('SUPERIOR') && !n.includes('SUBORDINADO')) d.titulo = v;
+    else if (n.includes('SUPERIOR IMEDIATO')) d.cargo_superior = v;
+    else if (n.includes('SUBORDINADO')) d.cargos_subordinados = v || '—';
+  }
+
+  // ── MISSÃO ──
+  if (iMissao >= 0 && iResp > iMissao)
+    d.missao = lines.slice(iMissao+1, iResp).filter(l=>!_nPdf(l.text).startsWith('(')).map(l=>l.text).join(' ').trim();
+
+  // ── RESPONSABILIDADES ──
+  if (iResp >= 0) {
+    const end = [iReq,iCompTec].filter(i=>i>iResp).sort((a,b)=>a-b)[0] || lines.length;
+    let cur = '';
+    for (const l of lines.slice(iResp+2, end)) {
+      const t = l.text.trim(); if (!t || _nPdf(t).startsWith('(DESCRICAO')) continue;
+      if (/^\d+\./.test(t)) { if(cur) d.responsabilidades.push(cur.trim()); cur=t; }
+      else cur += ' '+t;
+    }
+    if (cur.trim()) d.responsabilidades.push(cur.trim());
+  }
+
+  // ── REQUISITOS (2 colunas: x<300 = Conhecimentos, x≥300 = Habilidades) ──
+  if (iReq >= 0 && iCompTec > iReq) {
+    let cC='', cH='';
+    for (const l of lines.slice(iReq+2, iCompTec)) {
+      const n = _nPdf(l.text);
+      if (n.includes('CONHECIMENTO') && n.includes('HABILIDADE')) continue;
+      const [lft, rgt] = [l.items.filter(i=>i.x<300).map(i=>i.text).join(' ').trim(),
+                          l.items.filter(i=>i.x>=300).map(i=>i.text).join(' ').trim()];
+      if (lft) { if(cC && /^[A-ZÁÉÍÓÚ]/.test(lft) && /\.$/.test(cC)){ d.req_conhecimentos.push(cC.trim()); cC=lft; } else cC+=(cC?' ':'')+lft; }
+      if (rgt) { if(cH && /^[A-ZÁÉÍÓÚ]/.test(rgt) && /\.$/.test(cH)){ d.req_habilidades.push(cH.trim()); cH=rgt; } else cH+=(cH?' ':'')+rgt; }
+    }
+    if (cC.trim()) d.req_conhecimentos.push(cC.trim());
+    if (cH.trim()) d.req_habilidades.push(cH.trim());
+  }
+
+  // ── COMPETÊNCIAS TÉCNICAS (cols: x<185 nome | 185-490 desc | x≥490 grau) ──
+  if (iCompTec >= 0 && iCompComp > iCompTec)
+    d.comp_tecnicas = _parseComp3col(lines, iCompTec, iCompComp, 185, 490);
+
+  // ── COMPETÊNCIAS COMPORTAMENTAIS (cols: x<490 nome | x≥490 grau) ──
+  if (iCompComp >= 0 && iCompOrg > iCompComp) {
+    for (const l of lines.slice(iCompComp+2, iCompOrg)) {
+      const n = _nPdf(l.text);
+      if (n.includes('COMPETENCIA') || n === 'GRAU') continue;
+      const grau = parseInt(l.items.filter(i=>i.x>=490).map(i=>i.text).join(''));
+      const nome = l.items.filter(i=>i.x<490).map(i=>i.text).join(' ').trim();
+      if (nome && grau>=1 && grau<=5) d.comp_comportamentais.push({nome, grau});
+    }
+  }
+
+  // ── COMPETÊNCIAS ORGANIZACIONAIS ──
+  if (iCompOrg >= 0) {
+    const end = iInd > iCompOrg ? iInd : lines.length;
+    d.comp_organizacionais = _parseComp3col(lines, iCompOrg, end, 185, 490);
+  }
+
+  // ── INDICADORES ──
+  if (iIndBeh >= 0) {
+    const end = [iIndOrg,iIndPerf].filter(i=>i>iIndBeh).sort((a,b)=>a-b)[0]||lines.length;
+    d.ind_comportamentais = _parseInd2col(lines, iIndBeh, end);
+  }
+  if (iIndOrg >= 0) {
+    const end = iIndPerf > iIndOrg ? iIndPerf : lines.length;
+    d.ind_organizacionais = _parseInd2col(lines, iIndOrg, end);
+  }
+  if (iIndPerf >= 0)
+    d.ind_performance = lines.slice(iIndPerf+1).map(l=>l.text.trim()).filter(Boolean);
+
+  return d;
+}
+
+function _parseComp3col(lines, from, to, x2, x3) {
+  const res = []; let cur = null;
+  for (const l of lines.slice(from+2, to)) {
+    const n = _nPdf(l.text);
+    if (n.includes('COMPETENCIA') || n.includes('DESCRICAO') || n === 'GRAU') continue;
+    const c1 = l.items.filter(i=>i.x<x2).map(i=>i.text).join(' ').trim();
+    const c2 = l.items.filter(i=>i.x>=x2&&i.x<x3).map(i=>i.text).join(' ').trim();
+    const grau = parseInt(l.items.filter(i=>i.x>=x3).map(i=>i.text).join(''));
+    if (c1 && grau>=1 && grau<=5) { if(cur) res.push(cur); cur={nome:c1,descricao:c2,grau}; }
+    else if (cur) { if(c1) cur.nome+=' '+c1; if(c2) cur.descricao+=(cur.descricao?' ':'')+c2; if(grau>=1&&grau<=5&&!cur.grau) cur.grau=grau; }
+  }
+  if (cur) res.push(cur);
+  return res;
+}
+
+function _parseInd2col(lines, from, to) {
+  const res = []; let cur = null;
+  for (const l of lines.slice(from+1, to)) {
+    const c1 = l.items.filter(i=>i.x<200).map(i=>i.text).join(' ').trim();
+    const c2 = l.items.filter(i=>i.x>=200).map(i=>i.text).join(' ').trim();
+    if (c1 && c2) { if(cur) res.push(cur); cur={nome:c1,descricao:c2}; }
+    else if (c1 && cur) cur.nome+=' '+c1;
+    else if (c2 && cur) cur.descricao+=' '+c2;
+  }
+  if (cur) res.push(cur);
+  return res;
+}
+
+function _fillCargoModal(d) {
+  document.getElementById('cargoTitulo').value       = d.titulo||'';
+  document.getElementById('cargoSuperior').value     = d.cargo_superior||'';
+  document.getElementById('cargoSubordinados').value = d.cargos_subordinados||'';
+  document.getElementById('cargoMissao').value       = d.missao||'';
+  document.getElementById('cargoReqConhec').value    = (d.req_conhecimentos||[]).join('\n');
+  document.getElementById('cargoReqHabil').value     = (d.req_habilidades||[]).join('\n');
+  document.getElementById('cargoIndPerf').value      = (d.ind_performance||[]).join('\n');
+  ['respRows','compTecRows','compCompRows','compOrgRows','indCompRows','indOrgRows'].forEach(id=>document.getElementById(id).innerHTML='');
+  (d.responsabilidades||[]).forEach(t=>cargoAddRow('respRows','resp',{texto:t}));
+  (d.comp_tecnicas||[]).forEach(t=>cargoAddRow('compTecRows','compTec',t));
+  (d.comp_comportamentais||[]).forEach(t=>cargoAddRow('compCompRows','compComp',t));
+  (d.comp_organizacionais||[]).forEach(t=>cargoAddRow('compOrgRows','compOrg',t));
+  (d.ind_comportamentais||[]).forEach(t=>cargoAddRow('indCompRows','indComp',t));
+  (d.ind_organizacionais||[]).forEach(t=>cargoAddRow('indOrgRows','indOrg',t));
 }
 
 function _readCargoRows(containerId, tipo) {
