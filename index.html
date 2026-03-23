@@ -4930,28 +4930,29 @@ async function _parseCargoPDF(file) {
     if (cH.trim()) d.req_habilidades.push(cH.trim());
   }
 
-  // Detecta limiar de coluna pelo cabeçalho "Competência | Descrição | Grau"
-  const _xCol = (fromIdx, label, def) => {
-    for (const l of lines.slice(fromIdx, Math.min(fromIdx+6, lines.length))) {
-      const it = l.items.find(i => _nPdf(i.text).startsWith(_nPdf(label).slice(0,5)));
-      if (it) return it.x;
-    }
-    return def;
-  };
+  // Limiares fixos baseados no layout real do PDF (A4, margens ~35pt)
+  // Coluna nome: x=35..148  |  Descrição: x=148..475  |  Grau: x=475..560
+  const X2_COMP = 148, X3_COMP = 475;
 
   // ── COMPETÊNCIAS TÉCNICAS ──
-  if (iCompTec >= 0 && iCompComp > iCompTec) {
-    const x2t = _xCol(iCompTec, 'Descri', 130);
-    const x3t = _xCol(iCompTec, 'Grau',   480);
-    d.comp_tecnicas = _parseComp3col(lines, iCompTec, iCompComp, x2t, x3t);
-  }
+  if (iCompTec >= 0 && iCompComp > iCompTec)
+    d.comp_tecnicas = _parseComp3col(lines, iCompTec, iCompComp, X2_COMP, X3_COMP);
 
-  // ── COMPETÊNCIAS COMPORTAMENTAIS (cols: x<xGC nome | x≥xGC grau) ──
+  // ── COMPETÊNCIAS COMPORTAMENTAIS ──
   if (iCompComp >= 0 && iCompOrg > iCompComp) {
-    const xGC = _xCol(iCompComp, 'Grau', 460);
-    for (const l of lines.slice(iCompComp+2, iCompOrg)) {
+    const ccSlice = lines.slice(iCompComp+2, iCompOrg).filter(l => {
       const n = _nPdf(l.text);
-      if (n.includes('COMPETENCIA') || n === 'GRAU') continue;
+      return !n.includes('COMPETENCIA') && n !== 'GRAU';
+    });
+    // Auto-detecta threshold do grau: min-x dos itens exatamente "1".."5" no lado direito
+    const ccGrauItens = ccSlice.flatMap(l => l.items.filter(it => {
+      const v = parseInt(it.text.trim());
+      return v >= 1 && v <= 5 && it.text.trim() === String(v) && it.x > 300;
+    }));
+    const xGC = ccGrauItens.length > 0
+      ? Math.min(...ccGrauItens.map(it => it.x)) - 2
+      : 450;
+    for (const l of ccSlice) {
       const grau = parseInt(l.items.filter(i=>i.x>=xGC).map(i=>i.text).join(''));
       const nome = l.items.filter(i=>i.x<xGC).map(i=>i.text).join(' ').trim();
       if (nome && grau>=1 && grau<=5) d.comp_comportamentais.push({nome, grau});
@@ -4961,19 +4962,19 @@ async function _parseCargoPDF(file) {
   // ── COMPETÊNCIAS ORGANIZACIONAIS ──
   if (iCompOrg >= 0) {
     const end = iInd > iCompOrg ? iInd : lines.length;
-    const x2o = _xCol(iCompOrg, 'Descri', 130);
-    const x3o = _xCol(iCompOrg, 'Grau',   480);
-    d.comp_organizacionais = _parseComp3col(lines, iCompOrg, end, x2o, x3o);
+    d.comp_organizacionais = _parseComp3col(lines, iCompOrg, end, X2_COMP, X3_COMP);
   }
 
   // ── INDICADORES ──
+  // Indicadores: coluna nome x=35..140 | descrição x=140..560
+  const X_IND = 140;
   if (iIndBeh >= 0) {
     const end = [iIndOrg,iIndPerf].filter(i=>i>iIndBeh).sort((a,b)=>a-b)[0]||lines.length;
-    d.ind_comportamentais = _parseInd2col(lines, iIndBeh, end, 130);
+    d.ind_comportamentais = _parseInd2col(lines, iIndBeh, end, X_IND);
   }
   if (iIndOrg >= 0) {
     const end = iIndPerf > iIndOrg ? iIndPerf : lines.length;
-    d.ind_organizacionais = _parseInd2col(lines, iIndOrg, end, 130);
+    d.ind_organizacionais = _parseInd2col(lines, iIndOrg, end, X_IND);
   }
   if (iIndPerf >= 0)
     d.ind_performance = lines.slice(iIndPerf+1).map(l=>l.text.trim()).filter(Boolean);
@@ -4981,12 +4982,27 @@ async function _parseCargoPDF(file) {
   return d;
 }
 
-function _parseComp3col(lines, from, to, x2, x3) {
+function _parseComp3col(lines, from, to, _x2hint, _x3hint) {
   // Filtra cabeçalhos da seção/tabela
   const slice = lines.slice(from+2, to).filter(l => {
     const n = _nPdf(l.text);
     return !n.includes('COMPETENCIA') && !n.includes('DESCRICAO') && n !== 'GRAU';
   });
+  if (slice.length === 0) return [];
+
+  // Auto-detecta x3 a partir dos itens que são exatamente "1".."5" no lado direito
+  const grauItens = slice.flatMap(l => l.items.filter(it => {
+    const v = parseInt(it.text.trim());
+    return v >= 1 && v <= 5 && it.text.trim() === String(v) && it.x > 300;
+  }));
+  const x3 = grauItens.length > 0
+    ? Math.min(...grauItens.map(it => it.x)) - 2
+    : _x3hint;
+
+  // x2 = borda esquerda da tabela + 28 % do intervalo até x3
+  // (coluna Nome ocupa ~28% da largura da tabela neste layout)
+  const xMin = Math.min(...slice.flatMap(l => l.items.map(it => it.x)));
+  const x2   = xMin + 0.28 * (x3 - xMin);
 
   // 1ª passagem: localizar índices de linhas que possuem grau (1-5)
   const grauIdxs = [];
@@ -4998,7 +5014,7 @@ function _parseComp3col(lines, from, to, x2, x3) {
   // 2ª passagem: para cada grau, coletar TODOS os c1 (nome) e c2 (desc) do intervalo
   const res = [];
   for (let gi = 0; gi < grauIdxs.length; gi++) {
-    const {i: gIdx, g: grau} = grauIdxs[gi];
+    const {g: grau} = grauIdxs[gi];
     const start = gi > 0 ? grauIdxs[gi-1].i + 1 : 0;
     const end   = gi < grauIdxs.length - 1 ? grauIdxs[gi+1].i : slice.length;
     let nome = '', desc = '';
@@ -5013,15 +5029,26 @@ function _parseComp3col(lines, from, to, x2, x3) {
   return res;
 }
 
-function _parseInd2col(lines, from, to, xSplit) {
-  xSplit = xSplit || 130;
+function _parseInd2col(lines, from, to, xSplitDefault) {
+  xSplitDefault = xSplitDefault || 140;
   const res = []; let cur = null;
   for (const l of lines.slice(from+1, to)) {
-    const c1 = l.items.filter(i=>i.x<xSplit).map(i=>i.text).join(' ').trim();
-    const c2 = l.items.filter(i=>i.x>=xSplit).map(i=>i.text).join(' ').trim();
-    if (c1 && c2) { if(cur) res.push(cur); cur={nome:c1,descricao:c2}; }
+    if (!l.items.length) continue;
+    // Detecta o maior gap horizontal da linha para achar a fronteira nome | descrição
+    const sorted = [...l.items].sort((a,b) => a.x - b.x);
+    let gapSize = 0, gapX = xSplitDefault;
+    for (let i = 1; i < sorted.length; i++) {
+      const gap = sorted[i].x - (sorted[i-1].x + (sorted[i-1].text.length * 4));
+      if (gap > gapSize && sorted[i-1].x > 40 && sorted[i].x < 550) {
+        gapSize = gap; gapX = (sorted[i-1].x + sorted[i].x) / 2;
+      }
+    }
+    const splitX = gapSize > 18 ? gapX : xSplitDefault;
+    const c1 = sorted.filter(it => it.x < splitX).map(it => it.text).join(' ').trim();
+    const c2 = sorted.filter(it => it.x >= splitX).map(it => it.text).join(' ').trim();
+    if (c1 && c2) { if(cur) res.push(cur); cur={nome:c1, descricao:c2}; }
     else if (cur) {
-      const cont = [c1, c2].filter(Boolean).join(' ');
+      const cont = l.text.trim();
       if (cont) cur.descricao += (cur.descricao ? ' ' : '') + cont;
     }
   }
