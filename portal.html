@@ -291,7 +291,6 @@ const auth = firebase.auth();
 const db   = firebase.firestore();
 
 // ── Web3Forms ─────────────────────────────────────────────────
-const W3F_KEY    = 'f45660e4-db2c-409f-a7df-21e0058ab41b';
 const PORTAL_URL = 'https://daniellefelipe-ui.github.io/rh-ecgnow/portal.html';
 
 // ── State ────────────────────────────────────────────────────
@@ -593,7 +592,7 @@ async function enviarSolicitacao() {
     document.getElementById('sReqDiasInfo').style.display='none';
     toast('Solicitação enviada! Seu líder será notificado.');
     // Notifica líder por e-mail
-    enviarEmail('pendente', {id:ref.id,...data});
+    enviarNotif('pendente', {id:ref.id,...data});
     // Muda para aba de solicitações
     const tab = document.getElementById('ptab-minhassolics');
     if(tab) showPortalSection('minhassolics', tab);
@@ -758,7 +757,7 @@ async function pAprovar(id, step) {
     closePSolicModal();
     if (step==='lider') renderAprovacoes(); else renderAprovacoesRH();
     toast(step==='lider'?'Aprovado! RH será notificado.':'Férias aprovadas!');
-    enviarEmail(newStatus, allSolicitas.find(x=>x.id===id));
+    enviarNotif(newStatus, allSolicitas.find(x=>x.id===id));
   } catch(e) { toast('Erro: '+e.message,'e'); }
 }
 
@@ -774,22 +773,39 @@ async function pReprovar(id, step) {
     closePSolicModal();
     if (step==='lider') renderAprovacoes(); else renderAprovacoesRH();
     toast('Solicitação reprovada.','e');
-    enviarEmail(newStatus, allSolicitas.find(x=>x.id===id));
+    enviarNotif(newStatus, allSolicitas.find(x=>x.id===id));
   } catch(e) { toast('Erro: '+e.message,'e'); }
 }
 
-// ── Web3Forms ────────────────────────────────────────────────
-async function _w3fSend(to, subject, message) {
+// ── Google Chat Webhooks ──────────────────────────────────────
+async function _gchatSend(webhookUrl, text) {
+  if (!webhookUrl) return;
   try {
-    await fetch('https://api.web3forms.com/submit', {
+    await fetch(webhookUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ access_key: W3F_KEY, to, subject, from_name: 'RH ECGNow', message }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
     });
-  } catch(e) { console.error('[Web3Forms] erro:', e); }
+  } catch(e) { console.error('[GChat] erro:', e); }
 }
 
-function enviarEmail(tipo, solic) {
+async function _getWebhook(email) {
+  try {
+    const snap = await db.collection('usuarios').where('email','==',email).limit(1).get();
+    if (!snap.empty) return snap.docs[0].data().gchat_webhook || null;
+  } catch(e) {}
+  return null;
+}
+
+async function _getRHWebhook() {
+  try {
+    const doc = await db.collection('config').doc('notificacoes').get();
+    if (doc.exists) return doc.data().rh_webhook || null;
+  } catch(e) {}
+  return null;
+}
+
+async function enviarNotif(tipo, solic) {
   if (!solic) return;
   const nome   = solic.colaborador_nome;
   const inicio = _fmtDate(solic.data_inicio);
@@ -798,30 +814,40 @@ function enviarEmail(tipo, solic) {
   const obs    = solic.obs_colaborador || '—';
 
   if (tipo === 'pendente') {
-    _w3fSend(
-      solic.lider_email,
-      `[RH ECGNow] Nova solicitação de férias – ${nome}`,
-      `Olá ${solic.lider_nome||'Líder'},\n\n${nome} solicitou férias:\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n• Observação: ${obs}\n\nAcesse o portal para aprovar ou reprovar:\n${PORTAL_URL}\n\nAtenciosamente,\nRH ECGNow`
+    const hook = await _getWebhook(solic.lider_email);
+    await _gchatSend(hook,
+      `*[RH ECGNow] Nova solicitação de férias – ${nome}*\n` +
+      `Olá ${solic.lider_nome||'Líder'}, ${nome} solicitou férias:\n` +
+      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n• Observação: ${obs}\n` +
+      `<${PORTAL_URL}|Acessar o portal para aprovar ou reprovar>`
     );
   } else if (tipo === 'aprovado_lider') {
-    _w3fSend(
-      'danielle.felipe@ecgnow.com.br',
-      `[RH ECGNow] Aprovação pendente (RH) – ${nome}`,
-      `Olá Danielle,\n\nA solicitação de férias de ${nome} foi aprovada pelo líder e aguarda sua aprovação final:\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n\nAcesse o painel RH:\n${PORTAL_URL}\n\nAtenciosamente,\nRH ECGNow`
+    const hook = await _getRHWebhook();
+    await _gchatSend(hook,
+      `*[RH ECGNow] Aprovação pendente (RH) – ${nome}*\n` +
+      `A solicitação de férias de ${nome} foi aprovada pelo líder e aguarda sua aprovação final:\n` +
+      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n` +
+      `<${PORTAL_URL}|Acessar o painel RH>`
     );
   } else if (tipo === 'aprovado_rh') {
-    _w3fSend(
-      solic.colaborador_email,
-      `[RH ECGNow] Suas férias foram aprovadas!`,
-      `Olá ${nome.split(' ')[0]},\n\nSuas férias foram APROVADAS!\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n${solic.obs_rh?`• Obs: ${solic.obs_rh}`:''}\n\nBoas férias!\n\nAtenciosamente,\nRH ECGNow`
+    const hook = await _getWebhook(solic.colaborador_email);
+    await _gchatSend(hook,
+      `*[RH ECGNow] Férias aprovadas! ✅*\n` +
+      `Olá ${nome.split(' ')[0]}, suas férias foram *APROVADAS*!\n` +
+      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n` +
+      `${solic.obs_rh ? `• Obs: ${solic.obs_rh}\n` : ''}` +
+      `Boas férias! 🌴`
     );
   } else if (tipo === 'reprovado_lider' || tipo === 'reprovado_rh') {
     const quem = tipo === 'reprovado_lider' ? 'líder' : 'RH';
     const obsResp = tipo === 'reprovado_lider' ? solic.obs_lider : solic.obs_rh;
-    _w3fSend(
-      solic.colaborador_email,
-      `[RH ECGNow] Solicitação de férias reprovada`,
-      `Olá ${nome.split(' ')[0]},\n\nSua solicitação de férias foi reprovada pelo ${quem}.\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n${obsResp?`• Motivo: ${obsResp}`:''}\n\nEntre em contato com o RH para mais informações.\n\nAtenciosamente,\nRH ECGNow`
+    const hook = await _getWebhook(solic.colaborador_email);
+    await _gchatSend(hook,
+      `*[RH ECGNow] Solicitação de férias reprovada ❌*\n` +
+      `Olá ${nome.split(' ')[0]}, sua solicitação de férias foi reprovada pelo ${quem}.\n` +
+      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n` +
+      `${obsResp ? `• Motivo: ${obsResp}\n` : ''}` +
+      `Entre em contato com o RH para mais informações.`
     );
   }
 }
