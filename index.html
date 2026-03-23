@@ -4939,23 +4939,26 @@ async function _parseCargoPDF(file) {
     d.comp_tecnicas = _parseComp3col(lines, iCompTec, iCompComp, X2_COMP, X3_COMP);
 
   // ── COMPETÊNCIAS COMPORTAMENTAIS ──
+  // Usa a mesma lógica Y-range: cada grau define uma célula
   if (iCompComp >= 0 && iCompOrg > iCompComp) {
-    const ccSlice = lines.slice(iCompComp+2, iCompOrg).filter(l => {
-      const n = _nPdf(l.text);
-      return !n.includes('COMPETENCIA') && n !== 'GRAU';
-    });
-    // Auto-detecta threshold do grau: min-x dos itens exatamente "1".."5" no lado direito
-    const ccGrauItens = ccSlice.flatMap(l => l.items.filter(it => {
+    const ccItems = lines.slice(iCompComp+2, iCompOrg)
+      .filter(l => { const n=_nPdf(l.text); return !n.includes('COMPETENCIA')&&n!=='GRAU'; })
+      .flatMap(l => l.items);
+    const ccGraus = ccItems.filter(it => {
       const v = parseInt(it.text.trim());
       return v >= 1 && v <= 5 && it.text.trim() === String(v) && it.x > 300;
-    }));
-    const xGC = ccGrauItens.length > 0
-      ? Math.min(...ccGrauItens.map(it => it.x)) - 2
-      : 450;
-    for (const l of ccSlice) {
-      const grau = parseInt(l.items.filter(i=>i.x>=xGC).map(i=>i.text).join(''));
-      const nome = l.items.filter(i=>i.x<xGC).map(i=>i.text).join(' ').trim();
-      if (nome && grau>=1 && grau<=5) d.comp_comportamentais.push({nome, grau});
+    }).sort((a,b) => a.y - b.y);
+    if (ccGraus.length > 0) {
+      const xGC = Math.min(...ccGraus.map(it => it.x)) - 2;
+      for (let gi = 0; gi < ccGraus.length; gi++) {
+        const g = ccGraus[gi];
+        const grau = parseInt(g.text.trim());
+        const yPrev = gi > 0 ? (ccGraus[gi-1].y + g.y)/2 : g.y - 200;
+        const yNext = gi < ccGraus.length-1 ? (g.y + ccGraus[gi+1].y)/2 : g.y + 200;
+        const nome = ccItems.filter(it => it.y > yPrev && it.y <= yNext && it.x < xGC)
+                            .map(it => it.text).join(' ').trim();
+        if (nome) d.comp_comportamentais.push({nome, grau});
+      }
     }
   }
 
@@ -4983,48 +4986,56 @@ async function _parseCargoPDF(file) {
 }
 
 function _parseComp3col(lines, from, to, _x2hint, _x3hint) {
-  // Filtra cabeçalhos da seção/tabela
-  const slice = lines.slice(from+2, to).filter(l => {
-    const n = _nPdf(l.text);
-    return !n.includes('COMPETENCIA') && !n.includes('DESCRICAO') && n !== 'GRAU';
-  });
-  if (slice.length === 0) return [];
+  // Coleta todos os itens da seção (exclui cabeçalhos)
+  const allItems = lines.slice(from+2, to)
+    .filter(l => { const n=_nPdf(l.text); return !n.includes('COMPETENCIA')&&!n.includes('DESCRICAO')&&n!=='GRAU'; })
+    .flatMap(l => l.items);
+  if (allItems.length === 0) return [];
 
-  // Auto-detecta x3 a partir dos itens que são exatamente "1".."5" no lado direito
-  const grauItens = slice.flatMap(l => l.items.filter(it => {
+  // Auto-detecta itens de grau: dígito exato "1".."5" na metade direita da página
+  const grauItens = allItems.filter(it => {
     const v = parseInt(it.text.trim());
     return v >= 1 && v <= 5 && it.text.trim() === String(v) && it.x > 300;
-  }));
-  const x3 = grauItens.length > 0
-    ? Math.min(...grauItens.map(it => it.x)) - 2
-    : _x3hint;
+  }).sort((a,b) => a.y - b.y);
+  if (grauItens.length === 0) return [];
 
-  // x2 = borda esquerda da tabela + 28 % do intervalo até x3
-  // (coluna Nome ocupa ~28% da largura da tabela neste layout)
-  const xMin = Math.min(...slice.flatMap(l => l.items.map(it => it.x)));
+  // x3 = início da coluna Grau (mínimo-x dos itens de grau)
+  const x3 = Math.min(...grauItens.map(it => it.x)) - 2;
+  // x2 = borda da coluna Nome ≈ xMin + 28% do intervalo até x3
+  const xMin = Math.min(...allItems.filter(it => it.x < x3).map(it => it.x));
   const x2   = xMin + 0.28 * (x3 - xMin);
 
-  // 1ª passagem: localizar índices de linhas que possuem grau (1-5)
-  const grauIdxs = [];
-  for (let i = 0; i < slice.length; i++) {
-    const g = parseInt(slice[i].items.filter(it => it.x >= x3).map(it => it.text).join(''));
-    if (g >= 1 && g <= 5) grauIdxs.push({i, g});
-  }
+  // Para cada grau, define o intervalo Y da célula:
+  //   yPrev = ponto médio entre grau anterior e este grau
+  //   yNext = ponto médio entre este grau e o próximo
+  // → cada item pertence a exatamente uma célula, sem sobreposição
+  const yMax = to < lines.length ? lines[to].y : grauItens[grauItens.length-1].y + 300;
 
-  // 2ª passagem: para cada grau, coletar TODOS os c1 (nome) e c2 (desc) do intervalo
   const res = [];
-  for (let gi = 0; gi < grauIdxs.length; gi++) {
-    const {g: grau} = grauIdxs[gi];
-    const start = gi > 0 ? grauIdxs[gi-1].i + 1 : 0;
-    const end   = gi < grauIdxs.length - 1 ? grauIdxs[gi+1].i : slice.length;
-    let nome = '', desc = '';
-    for (const l of slice.slice(start, end)) {
-      const c1 = l.items.filter(it => it.x < x2).map(it => it.text).join(' ').trim();
-      const c2 = l.items.filter(it => it.x >= x2 && it.x < x3).map(it => it.text).join(' ').trim();
-      if (c1) nome += (nome ? ' ' : '') + c1;
-      if (c2) desc += (desc ? ' ' : '') + c2;
-    }
-    if (nome || desc) res.push({nome: nome.trim(), descricao: desc.trim(), grau});
+  for (let gi = 0; gi < grauItens.length; gi++) {
+    const g    = grauItens[gi];
+    const grau = parseInt(g.text.trim());
+    const gPrev = gi > 0 ? grauItens[gi-1].y : g.y - 500;
+    const gNext = gi < grauItens.length-1 ? grauItens[gi+1].y : g.y + 500;
+
+    // Ponto médio com ajuste: se houver salto de página (gap > 3× distância típica),
+    // o limite é deslocado para 80% do gap, garantindo capturar continuações pós-quebra
+    const gapFwd = gNext - g.y;
+    const avgGap = (grauItens[grauItens.length-1].y - grauItens[0].y) / Math.max(grauItens.length-1,1);
+    const fwd    = gapFwd > avgGap * 3 ? 0.8 : 0.5;
+
+    const yPrev = gi > 0 ? (gPrev + g.y) / 2 : g.y - 500;
+    const yNext = gi < grauItens.length-1
+      ? g.y + fwd * gapFwd
+      : Math.min(g.y + 300, yMax);
+
+    // Itens desta célula (exclui coluna Grau)
+    const cell = allItems.filter(it => it.y > yPrev && it.y <= yNext && it.x < x3)
+                         .sort((a,b) => a.y-b.y || a.x-b.x);
+
+    const nome = cell.filter(it => it.x <  x2).map(it => it.text).join(' ').trim();
+    const desc = cell.filter(it => it.x >= x2).map(it => it.text).join(' ').trim();
+    if (nome || desc) res.push({nome, descricao: desc, grau});
   }
   return res;
 }
