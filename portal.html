@@ -747,17 +747,35 @@ function closePSolicModal() { document.getElementById('pSolicModal').classList.r
 
 async function pAprovar(id, step) {
   const obs = document.getElementById('pSolicObs').value.trim();
-  const newStatus = step==='lider' ? 'aprovado_lider' : 'aprovado_rh';
-  const upd = {status:newStatus};
-  if (step==='lider') { upd.obs_lider=obs; upd.aprovado_lider_em=firebase.firestore.FieldValue.serverTimestamp(); }
-  else { upd.obs_rh=obs; upd.aprovado_rh_em=firebase.firestore.FieldValue.serverTimestamp(); }
+  const s = allSolicitas.find(x=>x.id===id);
+  const upd = {};
+
+  if (step === 'lider') {
+    upd.obs_lider = obs;
+    upd.aprovado_lider_em = firebase.firestore.FieldValue.serverTimestamp();
+    // Se RH já aprovou antes, vai direto para status final
+    upd.status = s.aprovado_rh_em ? 'aprovado_rh' : 'aprovado_lider';
+  } else {
+    upd.obs_rh = obs;
+    upd.aprovado_rh_em = firebase.firestore.FieldValue.serverTimestamp();
+    // Só muda para status final se líder já aprovou
+    if (s.status === 'aprovado_lider') upd.status = 'aprovado_rh';
+  }
+
   try {
     await db.collection('ferias_solicitacoes').doc(id).update(upd);
-    const s = allSolicitas.find(x=>x.id===id); if(s) Object.assign(s,upd);
+    if (s) Object.assign(s, upd);
     closePSolicModal();
-    if (step==='lider') renderAprovacoes(); else renderAprovacoesRH();
-    toast(step==='lider'?'Aprovado! RH será notificado.':'Férias aprovadas!');
-    enviarNotif(newStatus, allSolicitas.find(x=>x.id===id));
+    if (step === 'lider') renderAprovacoes(); else renderAprovacoesRH();
+    if (upd.status === 'aprovado_rh') {
+      toast('Férias aprovadas!');
+      enviarNotif('aprovado_rh', allSolicitas.find(x=>x.id===id));
+    } else if (upd.status === 'aprovado_lider') {
+      toast('Aprovado! RH será notificado.');
+      enviarNotif('aprovado_lider', allSolicitas.find(x=>x.id===id));
+    } else {
+      toast('Aprovação registrada! Aguardando aprovação do líder.');
+    }
   } catch(e) { toast('Erro: '+e.message,'e'); }
 }
 
