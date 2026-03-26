@@ -290,8 +290,19 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-// ── Web3Forms ─────────────────────────────────────────────────
+// ── Constantes ────────────────────────────────────────────────
 const PORTAL_URL = 'https://daniellefelipe-ui.github.io/rh-ecgnow/portal.html';
+const W3F_KEY    = 'f45660e4-db2c-409f-a7df-21e0058ab41b';
+
+async function _w3fSend(to, subject, message) {
+  try {
+    await fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ access_key: W3F_KEY, to, subject, from_name: 'RH ECGNow', message }),
+    });
+  } catch(e) { console.error('[Web3Forms] erro:', e); }
+}
 
 // ── State ────────────────────────────────────────────────────
 let currentUser = null;
@@ -846,25 +857,20 @@ async function enviarNotif(tipo, solic) {
       `Acesse o portal para aprovar ou reprovar: ${PORTAL_URL}`
     );
   } else if (tipo === 'aprovado_lider') {
-    // Líder aprovou → notifica colaborador (aprovação final)
-    const hook = await _getWebhook(solic.colaborador_email);
-    await _gchatSend(hook,
-      `*[RH ECGNow] Férias aprovadas! ✅*\n` +
-      `Olá ${nome.split(' ')[0]}, suas férias foram *APROVADAS*!\n` +
-      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n` +
-      `${solic.obs_lider ? `• Obs: ${solic.obs_lider}\n` : ''}` +
-      `Boas férias! 🌴`
+    // Líder aprovou → envia e-mail de confirmação para o colaborador
+    await _w3fSend(
+      solic.colaborador_email,
+      `[RH ECGNow] Suas férias foram aprovadas!`,
+      `Olá ${nome.split(' ')[0]},\n\nSuas férias foram APROVADAS!\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n${solic.obs_lider ? `• Obs: ${solic.obs_lider}` : ''}\n\nBoas férias!\n\nAtenciosamente,\nRH ECGNow`
     );
   } else if (tipo === 'reprovado_lider' || tipo === 'reprovado_rh') {
     const quem = tipo === 'reprovado_lider' ? 'líder' : 'RH';
     const obsResp = tipo === 'reprovado_lider' ? solic.obs_lider : solic.obs_rh;
-    const hook = await _getWebhook(solic.colaborador_email);
-    await _gchatSend(hook,
-      `*[RH ECGNow] Solicitação de férias reprovada ❌*\n` +
-      `Olá ${nome.split(' ')[0]}, sua solicitação de férias foi reprovada pelo ${quem}.\n` +
-      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n` +
-      `${obsResp ? `• Motivo: ${obsResp}\n` : ''}` +
-      `Entre em contato com o RH para mais informações.`
+    // Reprovação → envia e-mail para o colaborador
+    await _w3fSend(
+      solic.colaborador_email,
+      `[RH ECGNow] Solicitação de férias reprovada`,
+      `Olá ${nome.split(' ')[0]},\n\nSua solicitação de férias foi reprovada pelo ${quem}.\n• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n${obsResp ? `• Motivo: ${obsResp}` : ''}\n\nEntre em contato com o RH para mais informações.\n\nAtenciosamente,\nRH ECGNow`
     );
   }
 }
