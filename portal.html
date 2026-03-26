@@ -452,7 +452,7 @@ function renderMeusPeriodos() {
 function renderMinhasSolics() {
   const wrap = document.getElementById('pSolicsWrap');
   const mine = allSolicitas.filter(s=>s.colaborador_email===currentUser.email);
-  const sLabel = { pendente:'Aguard. Líder', aprovado_lider:'Aguard. RH', aprovado_rh:'Aprovada', reprovado_lider:'Reprovada (Líder)', reprovado_rh:'Reprovada (RH)' };
+  const sLabel = { pendente:'Aguard. RH', aprovado_rh:'Aguard. Líder', aprovado_lider:'Aprovada', reprovado_lider:'Reprovada (Líder)', reprovado_rh:'Reprovada (RH)' };
   const sClass = { pendente:'badge-pending', aprovado_lider:'badge-aprvlider', aprovado_rh:'badge-green', reprovado_lider:'badge-reprov', reprovado_rh:'badge-reprov' };
   if (!mine.length) { wrap.innerHTML=`<div class="empty-state">Nenhuma solicitação enviada ainda.</div>`; return; }
   wrap.innerHTML = `<table class="table">
@@ -590,8 +590,8 @@ async function enviarSolicitacao() {
     document.getElementById('sReqFim').value     = '';
     document.getElementById('sReqObs').value     = '';
     document.getElementById('sReqDiasInfo').style.display='none';
-    toast('Solicitação enviada! Seu líder será notificado.');
-    // Notifica líder por e-mail
+    toast('Solicitação enviada! O RH será notificado.');
+    // Notifica RH
     enviarNotif('pendente', {id:ref.id,...data});
     // Muda para aba de solicitações
     const tab = document.getElementById('ptab-minhassolics');
@@ -694,8 +694,8 @@ function renderEquipe() {
 // ── Aprovações (Líder) ───────────────────────────────────────
 function renderAprovacoes() {
   const wrap = document.getElementById('pAprovWrap');
-  // Filtra solicitações de colaboradores cujo líder_email == currentUser.email
-  const pendentes = allSolicitas.filter(s => s.lider_email===currentUser.email && s.status==='pendente');
+  // Filtra solicitações aprovadas pelo RH aguardando aprovação do líder
+  const pendentes = allSolicitas.filter(s => s.lider_email===currentUser.email && s.status==='aprovado_rh');
   if (!pendentes.length) { wrap.innerHTML=`<div class="empty-state">Nenhuma solicitação aguardando sua aprovação.</div>`; return; }
   wrap.innerHTML = _renderSolicTable(pendentes, 'lider');
 }
@@ -703,13 +703,13 @@ function renderAprovacoes() {
 // ── Aprovações (RH) ──────────────────────────────────────────
 function renderAprovacoesRH() {
   const wrap = document.getElementById('pAprovRhWrap');
-  const pendentes = allSolicitas.filter(s => s.status==='pendente' || s.status==='aprovado_lider');
+  const pendentes = allSolicitas.filter(s => s.status==='pendente');
   if (!pendentes.length) { wrap.innerHTML=`<div class="empty-state">Nenhuma solicitação aguardando aprovação do RH.</div>`; return; }
   wrap.innerHTML = _renderSolicTable(pendentes, 'rh');
 }
 
 function _renderSolicTable(list, step) {
-  const sLabel = { pendente:'Aguard. Líder', aprovado_lider:'Aguard. RH', aprovado_rh:'Aprovada', reprovado_lider:'Reprovada (Líder)', reprovado_rh:'Reprovada (RH)' };
+  const sLabel = { pendente:'Aguard. RH', aprovado_rh:'Aguard. Líder', aprovado_lider:'Aprovada', reprovado_lider:'Reprovada (Líder)', reprovado_rh:'Reprovada (RH)' };
   const sClass = { pendente:'badge-pending', aprovado_lider:'badge-aprvlider', aprovado_rh:'badge-green', reprovado_lider:'badge-reprov', reprovado_rh:'badge-reprov' };
   return `<table class="table">
     <thead><tr><th>Colaborador</th><th>Período Solicitado</th><th>Dias</th><th>Tipo</th>${step==='rh'?'<th>Etapa</th>':''}<th>Obs. Colaborador</th><th></th></tr></thead>
@@ -750,16 +750,14 @@ async function pAprovar(id, step) {
   const s = allSolicitas.find(x=>x.id===id);
   const upd = {};
 
-  if (step === 'lider') {
-    upd.obs_lider = obs;
-    upd.aprovado_lider_em = firebase.firestore.FieldValue.serverTimestamp();
-    // Se RH já aprovou antes, vai direto para status final
-    upd.status = s.aprovado_rh_em ? 'aprovado_rh' : 'aprovado_lider';
-  } else {
+  if (step === 'rh') {
     upd.obs_rh = obs;
     upd.aprovado_rh_em = firebase.firestore.FieldValue.serverTimestamp();
-    // Só muda para status final se líder já aprovou
-    if (s.status === 'aprovado_lider') upd.status = 'aprovado_rh';
+    upd.status = 'aprovado_rh';
+  } else {
+    upd.obs_lider = obs;
+    upd.aprovado_lider_em = firebase.firestore.FieldValue.serverTimestamp();
+    upd.status = 'aprovado_lider';
   }
 
   try {
@@ -767,14 +765,12 @@ async function pAprovar(id, step) {
     if (s) Object.assign(s, upd);
     closePSolicModal();
     if (step === 'lider') renderAprovacoes(); else renderAprovacoesRH();
-    if (upd.status === 'aprovado_rh') {
-      toast('Férias aprovadas!');
+    if (step === 'rh') {
+      toast('Aprovado! O líder será notificado.');
       enviarNotif('aprovado_rh', allSolicitas.find(x=>x.id===id));
-    } else if (upd.status === 'aprovado_lider') {
-      toast('Aprovado! RH será notificado.');
-      enviarNotif('aprovado_lider', allSolicitas.find(x=>x.id===id));
     } else {
-      toast('Aprovação registrada! Aguardando aprovação do líder.');
+      toast('Férias aprovadas!');
+      enviarNotif('aprovado_lider', allSolicitas.find(x=>x.id===id));
     }
   } catch(e) { toast('Erro: '+e.message,'e'); }
 }
@@ -832,28 +828,31 @@ async function enviarNotif(tipo, solic) {
   const obs    = solic.obs_colaborador || '—';
 
   if (tipo === 'pendente') {
-    const hook = await _getWebhook(solic.lider_email);
-    await _gchatSend(hook,
-      `*[RH ECGNow] Nova solicitação de férias – ${nome}*\n` +
-      `Olá ${solic.lider_nome||'Líder'}, ${nome} solicitou férias:\n` +
-      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n• Observação: ${obs}\n` +
-      `<${PORTAL_URL}|Acessar o portal para aprovar ou reprovar>`
-    );
-  } else if (tipo === 'aprovado_lider') {
+    // Notifica RH
     const hook = await _getRHWebhook();
     await _gchatSend(hook,
-      `*[RH ECGNow] Aprovação pendente (RH) – ${nome}*\n` +
-      `A solicitação de férias de ${nome} foi aprovada pelo líder e aguarda sua aprovação final:\n` +
-      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n` +
-      `<${PORTAL_URL}|Acessar o painel RH>`
+      `*[RH ECGNow] Nova solicitação de férias – ${nome}*\n` +
+      `${nome} solicitou férias e aguarda sua validação:\n` +
+      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n• Observação: ${obs}\n` +
+      `Acesse o painel RH: ${PORTAL_URL}`
     );
   } else if (tipo === 'aprovado_rh') {
+    // RH aprovou → notifica líder
+    const hook = await _getWebhook(solic.lider_email);
+    await _gchatSend(hook,
+      `*[RH ECGNow] Solicitação de férias aguarda sua aprovação – ${nome}*\n` +
+      `Olá ${solic.lider_nome||'Líder'}, o RH validou a solicitação de férias de ${nome}:\n` +
+      `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n` +
+      `Acesse o portal para aprovar ou reprovar: ${PORTAL_URL}`
+    );
+  } else if (tipo === 'aprovado_lider') {
+    // Líder aprovou → notifica colaborador (aprovação final)
     const hook = await _getWebhook(solic.colaborador_email);
     await _gchatSend(hook,
       `*[RH ECGNow] Férias aprovadas! ✅*\n` +
       `Olá ${nome.split(' ')[0]}, suas férias foram *APROVADAS*!\n` +
       `• Período: ${inicio} a ${fim}\n• Dias: ${dias}\n` +
-      `${solic.obs_rh ? `• Obs: ${solic.obs_rh}\n` : ''}` +
+      `${solic.obs_lider ? `• Obs: ${solic.obs_lider}\n` : ''}` +
       `Boas férias! 🌴`
     );
   } else if (tipo === 'reprovado_lider' || tipo === 'reprovado_rh') {
