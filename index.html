@@ -3977,18 +3977,19 @@ async function loadFerias() {
     allFerSolicita = snapS.docs.map(d => ({ id:d.id, ...d.data() }));
     allFerUsuarios = snapU.docs.map(d => ({ id:d.id, ...d.data() }));
     buildFeriasKpis();
+    setFerTab(_ferTab);
   } catch(e) { console.error('loadFerias:', e); }
 }
 
 function buildFeriasKpis() {
   const hoje = new Date();
-  const pendentes = allFerSolicita.filter(s => s.status==='pendente' || s.status==='aprovado_lider').length;
+  const pendentes = allFerSolicita.filter(s => s.status==='pendente' || s.status==='aprovado_rh').length;
   const vencendo  = allFerPeriodos.filter(p => {
     const diff = (new Date(p.data_limite+'T12:00:00') - hoje) / 86400000;
     const saldo = _calcSaldo(p).saldo;
     return diff >= 0 && diff <= 60 && saldo > 0;
   }).length;
-  const aprovados = allFerSolicita.filter(s => s.status==='aprovado_rh').length;
+  const aprovados = allFerSolicita.filter(s => s.status==='aprovado_lider').length;
   document.getElementById('feriasKpis').innerHTML = `
     <div class="kpi-card"><div class="kpi-lbl">Períodos Cadastrados</div><div class="kpi-val">${allFerPeriodos.length}</div><div class="kpi-sub">períodos aquisitivos</div></div>
     <div class="kpi-card"><div class="kpi-lbl">Aguard. Aprovação</div><div class="kpi-val" style="color:${pendentes>0?'#b45309':'#071e34'}">${pendentes}</div><div class="kpi-sub">solicitações pendentes</div></div>
@@ -4070,7 +4071,7 @@ function renderFerPeriodos() {
 
 function renderFerSolicitacoes() {
   const wrap = document.getElementById('ferWrap');
-  const statusLabel = { pendente:'Aguard. Líder', aprovado_lider:'Aguard. RH', aprovado_rh:'Aprovada', reprovado_lider:'Reprovada (Líder)', reprovado_rh:'Reprovada (RH)' };
+  const statusLabel = { pendente:'Aguard. RH', aprovado_rh:'Aguard. Líder', aprovado_lider:'Aprovada', reprovado_lider:'Reprovada (Líder)', reprovado_rh:'Reprovada (RH)' };
   const statusClass = { pendente:'badge-pending', aprovado_lider:'badge-aprvlider', aprovado_rh:'badge-green', reprovado_lider:'badge-reprov', reprovado_rh:'badge-reprov' };
   if (!allFerSolicita.length) { wrap.innerHTML = `<div class="empty-state">Nenhuma solicitação encontrada.</div>`; return; }
   wrap.innerHTML = `<table class="table">
