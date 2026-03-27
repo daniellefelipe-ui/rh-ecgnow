@@ -4616,22 +4616,21 @@ async function loadCargos() {
 }
 
 function renderCargosKpis() {
-  const comPdf = allCargos.filter(c => c.pdf_url).length;
+  const comInd = allCargos.filter(c => (c.ind_comportamentais||[]).length > 0).length;
   document.getElementById('cargosKpis').innerHTML = `
     <div class="kpi-card"><div class="kpi-lbl">Total de Cargos</div><div class="kpi-val">${allCargos.length}</div><div class="kpi-sub">cadastrados</div></div>
-    <div class="kpi-card"><div class="kpi-lbl">Com PDF</div><div class="kpi-val">${comPdf}</div><div class="kpi-sub">descrições em PDF</div></div>
-    <div class="kpi-card"><div class="kpi-lbl">Sem PDF</div><div class="kpi-val">${allCargos.length - comPdf}</div><div class="kpi-sub">aguardando upload</div></div>`;
+    <div class="kpi-card"><div class="kpi-lbl">Com Indicadores</div><div class="kpi-val">${comInd}</div><div class="kpi-sub">cargos com indicadores</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Sem Indicadores</div><div class="kpi-val">${allCargos.length - comInd}</div><div class="kpi-sub">aguardando preenchimento</div></div>`;
 }
 
 function renderCargosList(lista) {
   const wrap = document.getElementById('cargosListWrap');
   if (!lista.length) { wrap.innerHTML = '<div class="empty-state">Nenhum cargo cadastrado.<br><small>Clique em "+ Novo Cargo" para começar.</small></div>'; return; }
   wrap.innerHTML = `<table class="table"><thead><tr>
-    <th>Título do Cargo</th><th>Cargo Superior</th><th style="text-align:center">PDF</th><th>Comp. Técnicas</th><th>Comp. Comportamentais</th><th></th>
+    <th>Título do Cargo</th><th>Cargo Superior</th><th>Comp. Técnicas</th><th>Comp. Comportamentais</th><th></th>
   </tr></thead><tbody>${lista.map(c => `<tr>
     <td><strong style="color:#1a2535">${c.titulo||'—'}</strong></td>
     <td style="font-size:12px;color:#64748b">${c.cargo_superior||'—'}</td>
-    <td style="text-align:center">${c.pdf_url ? `<a href="${c.pdf_url}" target="_blank" class="badge badge-green" style="text-decoration:none">📄 PDF</a>` : '<span class="badge badge-orange">Sem PDF</span>'}</td>
     <td style="font-size:12px">${(c.comp_tecnicas||[]).length} item(s)</td>
     <td style="font-size:12px">${(c.comp_comportamentais||[]).length} item(s)</td>
     <td><div style="display:flex;gap:6px">
