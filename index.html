@@ -203,6 +203,7 @@
         <button class="nav-item" onclick="showSection('ferias',this)">🏖 &nbsp;Férias</button>
         <button class="nav-item" onclick="showSection('cargos',this)">📄 &nbsp;Cargos</button>
         <button class="nav-item" onclick="showSection('plano',this)">🗺️ &nbsp;Plano de Carreira</button>
+        <button class="nav-item" onclick="showSection('avaliacao',this)">⭐ &nbsp;Avaliação de Desempenho</button>
       </nav>
     </div>
     <div class="sb-footer">
@@ -609,6 +610,25 @@
           </div>
         </div>
         <div id="cargoDetalheWrap" style="padding:8px 0"></div>
+      </div>
+    </section>
+
+    <!-- ══ AVALIAÇÃO DE DESEMPENHO ══════════════════════════ -->
+    <section class="page-section" id="sec-avaliacao">
+      <div class="page-header"><h1>Avaliação de Desempenho</h1></div>
+      <div class="kpi-grid" id="avalKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline" id="avalTab-ciclos"     onclick="setAvalTab('ciclos',this)">📅 Ciclos</button>
+            <button class="btn btn-outline" id="avalTab-importar"   onclick="setAvalTab('importar',this)">📥 Importar</button>
+            <button class="btn btn-outline" id="avalTab-resultados" onclick="setAvalTab('resultados',this)">📊 Resultados</button>
+          </div>
+          <div id="avalTabActions" style="display:flex;gap:8px;align-items:center"></div>
+        </div>
+        <div id="avalWrap"><div class="empty-state">Selecione uma aba acima.</div></div>
       </div>
     </section>
 
@@ -1377,6 +1397,65 @@
   </div>
 </div>
 
+<!-- MODAL AVALIAÇÃO MANUAL (2023/2024) -->
+<div class="modal-overlay" id="avalManualModal">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <span class="modal-title" id="avalManualTitle">Cadastrar Avaliação Manual</span>
+      <button class="modal-close" onclick="closeAvalManualModal()">×</button>
+    </div>
+    <input type="hidden" id="avalManualId">
+    <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px">
+      <div class="form-group">
+        <label class="form-label">Colaborador *</label>
+        <select class="form-input" id="avalManualColab"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ciclo *</label>
+        <select class="form-input" id="avalManualCiclo"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nota Final (0–5) *</label>
+        <input type="number" class="form-input" id="avalManualNota" min="0" max="5" step="0.1" placeholder="ex: 4.2">
+      </div>
+      <div class="form-group">
+        <label class="form-label">PDF (opcional)</label>
+        <input type="file" class="form-input" id="avalManualPdf" accept=".pdf" style="padding:6px">
+      </div>
+      <div class="form-group full" style="grid-column:1/-1">
+        <label class="form-label">Observações</label>
+        <textarea class="form-input" id="avalManualObs" rows="3" placeholder="Comentários sobre a avaliação"></textarea>
+      </div>
+    </div>
+    <div id="avalManualPdfAtual" style="font-size:12px;color:#64748b;margin-top:4px"></div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeAvalManualModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btnSaveAvalManual" onclick="saveAvalManual()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REVISÃO IMPORTAÇÃO -->
+<div class="modal-overlay" id="avalRevisaoModal">
+  <div class="modal" style="width:900px;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <span class="modal-title">Revisar Importação</span>
+      <button class="modal-close" onclick="closeAvalRevisaoModal()">×</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:16px 24px">
+      <p style="font-size:12px;color:#64748b;margin-bottom:16px">Confirme ou ajuste o colaborador e avaliador de cada linha antes de importar. Colunas em azul entram na nota; em cinza são dissertativas.</p>
+      <div id="avalRevisaoWrap"></div>
+    </div>
+    <div style="flex-shrink:0;padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+      <span id="avalRevisaoInfo" style="font-size:12px;color:#64748b"></span>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline" onclick="closeAvalRevisaoModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btnConfirmarImportacao" onclick="confirmarImportacaoAval()">Confirmar Importação</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL FAIXA SALARIAL -->
 <div class="modal-overlay" id="faixaModal">
   <div class="modal" style="width:480px">
@@ -1734,6 +1813,7 @@ async function loadAll() {
   await loadFerias();
   await loadCargos();
   await loadPlano();
+  await loadAvaliacao();
   buildDashboard();
 }
 
@@ -5312,6 +5392,569 @@ async function deleteCargoFromModal() {
     document.getElementById('cargoDetalheCard').style.display = 'none';
     await loadCargos();
   } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+// ══ AVALIAÇÃO DE DESEMPENHO ════════════════════════════════
+const AVAL_CICLOS_FIXOS = [
+  { id:'2023', nome:'2023', status:'fechado' },
+  { id:'2024', nome:'2024', status:'fechado' },
+  { id:'2025', nome:'2025', status:'fechado' },
+  { id:'2026', nome:'2026', status:'aberto'  }
+];
+
+let allAvalRespostas = [], allAvalManuais = [];
+let _avalTab = 'ciclos';
+let _avalImportCache = null; // rows pendentes de revisão
+let _avalImportMeta  = {};   // { cicloId, tipo }
+
+async function loadAvaliacao() {
+  try {
+    const [snR, snM] = await Promise.all([
+      db.collection('aval_respostas').get(),
+      db.collection('aval_manuais').get()
+    ]);
+    allAvalRespostas = snR.docs.map(d => ({id:d.id,...d.data()}));
+    allAvalManuais   = snM.docs.map(d => ({id:d.id,...d.data()}));
+    buildAvalKpis();
+    setAvalTab(_avalTab);
+  } catch(e) { console.error('loadAvaliacao:', e); }
+}
+
+function buildAvalKpis() {
+  const avaliados = new Set([
+    ...allAvalRespostas.map(r => r.avaliado_id||r.avaliado_nome),
+    ...allAvalManuais.map(m => m.colaborador_id||m.colaborador_nome)
+  ]);
+  const ciclosComDados = new Set([
+    ...allAvalRespostas.map(r => r.ciclo_id),
+    ...allAvalManuais.map(m => m.ciclo_id)
+  ]);
+  document.getElementById('avalKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">Colaboradores Avaliados</div><div class="kpi-val">${avaliados.size}</div><div class="kpi-sub">no total</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Respostas Importadas</div><div class="kpi-val">${allAvalRespostas.length}</div><div class="kpi-sub">via Forms</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Avaliações Manuais</div><div class="kpi-val">${allAvalManuais.length}</div><div class="kpi-sub">2023 e 2024</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Ciclos com Dados</div><div class="kpi-val">${ciclosComDados.size}</div><div class="kpi-sub">de 4 ciclos</div></div>
+  `;
+}
+
+function setAvalTab(tab, btn) {
+  _avalTab = tab;
+  document.querySelectorAll('[id^="avalTab-"]').forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-outline'); });
+  const active = btn || document.getElementById('avalTab-' + tab);
+  if (active) { active.classList.remove('btn-outline'); active.classList.add('btn-primary'); }
+  document.getElementById('avalTabActions').innerHTML = '';
+  if      (tab === 'ciclos')     renderAvalCiclos();
+  else if (tab === 'importar')   renderAvalImportar();
+  else if (tab === 'resultados') renderAvalResultados();
+}
+
+// ── Ciclos ─────────────────────────────────────────────────
+function renderAvalCiclos() {
+  document.getElementById('avalTabActions').innerHTML =
+    `<button class="btn btn-primary btn-sm" onclick="openAvalManualModal(null)">+ Avaliação Manual</button>`;
+
+  let rows = '';
+  AVAL_CICLOS_FIXOS.forEach(c => {
+    const respostas = allAvalRespostas.filter(r => r.ciclo_id === c.id);
+    const manuais   = allAvalManuais.filter(m => m.ciclo_id === c.id);
+    const avaliados = new Set([
+      ...respostas.map(r => r.avaliado_id||r.avaliado_nome),
+      ...manuais.map(m => m.colaborador_id||m.colaborador_nome)
+    ]);
+    const statusBadge = c.status === 'aberto'
+      ? '<span class="badge badge-green">Aberto</span>'
+      : '<span class="badge badge-blue">Fechado</span>';
+    rows += `<tr>
+      <td><b>${c.nome}</b></td>
+      <td>${statusBadge}</td>
+      <td style="text-align:center">${avaliados.size}</td>
+      <td style="text-align:center">${respostas.length}</td>
+      <td style="text-align:center">${manuais.length}</td>
+      <td style="text-align:center">
+        <button class="btn btn-outline btn-sm" onclick="setAvalTab('resultados');_avalFiltroSciclo='${c.id}';renderAvalResultados()">Ver Resultados</button>
+      </td>
+    </tr>`;
+  });
+
+  document.getElementById('avalWrap').innerHTML = `
+    <table class="table">
+      <thead><tr>
+        <th>Ciclo</th><th>Status</th><th style="text-align:center">Avaliados</th>
+        <th style="text-align:center">Respostas Forms</th><th style="text-align:center">Manuais</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Avaliação Manual ───────────────────────────────────────
+function openAvalManualModal(id) {
+  const colabOpts = allColabs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  const cicloOpts = AVAL_CICLOS_FIXOS.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  document.getElementById('avalManualColab').innerHTML = '<option value="">Selecione</option>' + colabOpts;
+  document.getElementById('avalManualCiclo').innerHTML = cicloOpts;
+  document.getElementById('avalManualNota').value = '';
+  document.getElementById('avalManualObs').value  = '';
+  document.getElementById('avalManualPdf').value  = '';
+  document.getElementById('avalManualPdfAtual').innerHTML = '';
+  document.getElementById('avalManualId').value = id || '';
+
+  if (id) {
+    const m = allAvalManuais.find(x => x.id === id);
+    if (m) {
+      document.getElementById('avalManualColab').value = m.colaborador_id || '';
+      document.getElementById('avalManualCiclo').value = m.ciclo_id || '';
+      document.getElementById('avalManualNota').value  = m.nota_final || '';
+      document.getElementById('avalManualObs').value   = m.observacoes || '';
+      document.getElementById('avalManualTitle').textContent = 'Editar Avaliação Manual';
+      if (m.pdf_url) document.getElementById('avalManualPdfAtual').innerHTML =
+        `PDF atual: <a href="${m.pdf_url}" target="_blank" style="color:#1a8fe3">visualizar</a>`;
+    }
+  } else {
+    document.getElementById('avalManualTitle').textContent = 'Cadastrar Avaliação Manual';
+  }
+  document.getElementById('avalManualModal').classList.add('open');
+}
+
+function closeAvalManualModal() {
+  document.getElementById('avalManualModal').classList.remove('open');
+}
+
+async function saveAvalManual() {
+  const colabId  = document.getElementById('avalManualColab').value;
+  const cicloId  = document.getElementById('avalManualCiclo').value;
+  const nota     = parseFloat(document.getElementById('avalManualNota').value);
+  const obs      = document.getElementById('avalManualObs').value.trim();
+  const pdfFile  = document.getElementById('avalManualPdf').files[0];
+  const editId   = document.getElementById('avalManualId').value;
+
+  if (!colabId || !cicloId || isNaN(nota)) { toast('Preencha colaborador, ciclo e nota.','e'); return; }
+  const colab = allColabs.find(c => c.id === colabId) || {};
+
+  const btn = document.getElementById('btnSaveAvalManual');
+  btn.textContent = 'Salvando...'; btn.disabled = true;
+
+  try {
+    let pdf_url = editId ? (allAvalManuais.find(m=>m.id===editId)||{}).pdf_url||'' : '';
+    if (pdfFile) {
+      const ref = storage.ref(`avaliacoes/${cicloId}/${colabId}_${Date.now()}.pdf`);
+      await ref.put(pdfFile);
+      pdf_url = await ref.getDownloadURL();
+    }
+    const data = {
+      colaborador_id:   colabId,
+      colaborador_nome: colab.nome || '',
+      colaborador_cargo: colab.cargo || '',
+      ciclo_id:  cicloId,
+      nota_final: nota,
+      observacoes: obs,
+      pdf_url,
+      tipo: 'manual',
+      criado_em: new Date().toISOString()
+    };
+    if (editId) {
+      await db.collection('aval_manuais').doc(editId).set(data, {merge:true});
+    } else {
+      await db.collection('aval_manuais').add(data);
+    }
+    toast('Avaliação salva!');
+    closeAvalManualModal();
+    await loadAvaliacao();
+    setAvalTab('ciclos');
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+  finally { btn.textContent = 'Salvar'; btn.disabled = false; }
+}
+
+// ── Importar ───────────────────────────────────────────────
+let _avalFiltroSiciclo = '';
+function renderAvalImportar() {
+  const cicloOpts = AVAL_CICLOS_FIXOS.map(c =>
+    `<option value="${c.id}">${c.nome}</option>`).join('');
+
+  document.getElementById('avalWrap').innerHTML = `
+    <div style="max-width:600px">
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">Ciclo *</label>
+        <select class="form-input" id="avalImportCiclo" style="width:200px">${cicloOpts}</select>
+      </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">Tipo da Aba *</label>
+        <select class="form-input" id="avalImportTipo" style="width:260px">
+          <option value="principal">Líder avalia Time (peso 80%)</option>
+          <option value="secundario">Time avalia Liderança (peso 20%)</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">Nome da Aba (ex: Time - Holter)</label>
+        <input type="text" class="form-input" id="avalImportAba" style="width:260px" placeholder="ex: Time - Holter">
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label class="form-label">Arquivo CSV *</label>
+        <input type="file" accept=".csv,.xlsx,.xls" id="avalImportFile" style="display:none" onchange="previewAvalImport(this)">
+        <button class="btn btn-outline" onclick="document.getElementById('avalImportFile').click()">Selecionar arquivo CSV</button>
+        <div id="avalImportPreview" style="margin-top:10px;font-size:12px;color:#334155"></div>
+      </div>
+      <p style="font-size:11px;color:#94a3b8">O sistema detecta automaticamente quais colunas são numéricas (entram na nota) e quais são dissertativas. Após carregar o arquivo, você poderá revisar e ajustar nomes antes de confirmar a importação.</p>
+    </div>`;
+}
+
+async function previewAvalImport(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const prev = document.getElementById('avalImportPreview');
+  prev.innerHTML = 'Lendo arquivo...';
+  try {
+    const rows = await _parseCSV(file);
+    const valid = rows.filter(r => Object.values(r).some(v => v !== ''));
+    if (!valid.length) { prev.innerHTML = '<span style="color:#dc2626">Arquivo vazio.</span>'; return; }
+    _avalImportCache = valid;
+    prev.innerHTML = `<span style="color:#15803d">✓ ${valid.length} respostas encontradas.</span>
+      <button class="btn btn-primary btn-sm" style="margin-left:12px" onclick="abrirRevisaoAval()">Revisar e Importar</button>`;
+  } catch(e) {
+    prev.innerHTML = `<span style="color:#dc2626">Erro: ${e.message}</span>`;
+  }
+}
+
+function abrirRevisaoAval() {
+  const rows = _avalImportCache;
+  if (!rows || !rows.length) return;
+
+  const cicloId = document.getElementById('avalImportCiclo').value;
+  const tipo    = document.getElementById('avalImportTipo').value;
+  const aba     = document.getElementById('avalImportAba').value.trim();
+  _avalImportMeta = { cicloId, tipo, aba };
+
+  // Detectar colunas numéricas vs dissertativas
+  const allKeys = Object.keys(rows[0]);
+  const idCols  = ['carimbo','email','nome','avaliado','avaliador','cargo'].map(k => k);
+  const isIdCol = k => {
+    const kn = _normKey(k);
+    return kn.includes('carimbo') || kn.includes('email') || kn.includes('nomedo') ||
+           kn.includes('nomedo') || kn.includes('avaliado') || kn.includes('avaliador') || kn.includes('cargo');
+  };
+  const questionCols = allKeys.filter(k => !isIdCol(k));
+  const numericCols  = questionCols.filter(k => {
+    const vals = rows.map(r => r[k]).filter(v => v !== '' && v != null);
+    return vals.length > 0 && vals.every(v => { const n = Number(v); return !isNaN(n) && n >= 1 && n <= 5; });
+  });
+  const discCols = questionCols.filter(k => !numericCols.includes(k));
+
+  // Nota geral: coluna numérica que contém "nota geral"
+  const notaGeralCol = numericCols.find(k => _normKey(k).includes('notageral') || _normKey(k).includes('notager'));
+
+  const colabOpts = '<option value="">— nome livre —</option>' +
+    allColabs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+
+  let tableRows = '';
+  rows.forEach((row, i) => {
+    const avaliadoNome  = _col(row,'Nome do colaborador avaliado','Nome do avaliado','Avaliado') || '';
+    const avaliadorNome = _col(row,'Nome do avaliador','Avaliador') || '';
+    const matchAvaliado  = allColabs.find(c => c.nome && c.nome.toLowerCase().trim() === avaliadoNome.toLowerCase().trim());
+    const matchAvaliador = allColabs.find(c => c.nome && c.nome.toLowerCase().trim() === avaliadorNome.toLowerCase().trim());
+
+    tableRows += `<tr>
+      <td style="font-size:12px;color:#64748b">${i+1}</td>
+      <td>
+        <select class="form-input" id="aval-avaliado-${i}" style="font-size:12px;width:100%">
+          ${colabOpts.replace(`value="${matchAvaliado?.id||''}"`, `value="${matchAvaliado?.id||''}" selected`)}
+        </select>
+        <input type="text" class="form-input" id="aval-avaliado-nome-${i}" value="${avaliadoNome}"
+          style="font-size:11px;margin-top:4px;color:#94a3b8" placeholder="Nome livre se não encontrado">
+      </td>
+      <td>
+        <select class="form-input" id="aval-avaliador-${i}" style="font-size:12px;width:100%">
+          ${colabOpts.replace(`value="${matchAvaliador?.id||''}"`, `value="${matchAvaliador?.id||''}" selected`)}
+        </select>
+        <input type="text" class="form-input" id="aval-avaliador-nome-${i}" value="${avaliadorNome}"
+          style="font-size:11px;margin-top:4px;color:#94a3b8" placeholder="Nome livre se não encontrado">
+      </td>
+      <td style="text-align:center;font-size:12px">${numericCols.filter(k=>k!==notaGeralCol).length}</td>
+      <td style="text-align:center;font-size:12px">${notaGeralCol ? (row[notaGeralCol]||'—') : '—'}</td>
+      <td style="text-align:center;font-size:12px">${discCols.length}</td>
+    </tr>`;
+  });
+
+  document.getElementById('avalRevisaoWrap').innerHTML = `
+    <div style="margin-bottom:12px;display:flex;gap:16px;font-size:12px">
+      <span style="color:#1d4ed8">● ${numericCols.filter(k=>k!==notaGeralCol).length} colunas entram na nota</span>
+      <span style="color:#64748b">● ${discCols.length} colunas dissertativas (armazenadas)</span>
+      ${notaGeralCol ? `<span style="color:#b45309">● "Nota geral" detectada</span>` : ''}
+    </div>
+    <div style="overflow-x:auto">
+    <table class="table">
+      <thead><tr>
+        <th>#</th><th style="min-width:220px">Colaborador Avaliado</th>
+        <th style="min-width:220px">Avaliador</th>
+        <th style="text-align:center">Perguntas Nota</th>
+        <th style="text-align:center">Nota Geral</th>
+        <th style="text-align:center">Dissertativas</th>
+      </tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    </div>`;
+
+  document.getElementById('avalRevisaoInfo').textContent =
+    `${rows.length} respostas · Ciclo: ${cicloId} · Tipo: ${tipo === 'principal' ? 'Principal 80%' : 'Secundário 20%'} · Aba: ${aba||'—'}`;
+
+  // Salvar meta dos cols para usar no confirm
+  window._avalColsMeta = { numericCols, discCols, notaGeralCol };
+  document.getElementById('avalRevisaoModal').classList.add('open');
+}
+
+function closeAvalRevisaoModal() {
+  document.getElementById('avalRevisaoModal').classList.remove('open');
+}
+
+async function confirmarImportacaoAval() {
+  const rows    = _avalImportCache;
+  const meta    = _avalImportMeta;
+  const colsMeta = window._avalColsMeta;
+  if (!rows || !meta || !colsMeta) return;
+
+  const { numericCols, discCols, notaGeralCol } = colsMeta;
+  const btn = document.getElementById('btnConfirmarImportacao');
+  btn.textContent = 'Importando...'; btn.disabled = true;
+
+  try {
+    const CHUNK = 490;
+    const docs = rows.map((row, i) => {
+      const avaliadoId   = document.getElementById(`aval-avaliado-${i}`)?.value || '';
+      const avaliadoNome = document.getElementById(`aval-avaliado-nome-${i}`)?.value || '';
+      const avaliadorId   = document.getElementById(`aval-avaliador-${i}`)?.value || '';
+      const avaliadorNome = document.getElementById(`aval-avaliador-nome-${i}`)?.value || '';
+
+      const scores = {};
+      numericCols.filter(k => k !== notaGeralCol).forEach(k => {
+        const v = Number(row[k]);
+        if (!isNaN(v)) scores[k] = v;
+      });
+
+      const dissertativas = {};
+      discCols.forEach(k => { if (row[k]) dissertativas[k] = String(row[k]); });
+
+      const media = Object.values(scores).length
+        ? Object.values(scores).reduce((a,b) => a+b, 0) / Object.values(scores).length
+        : null;
+
+      return {
+        ciclo_id:       meta.cicloId,
+        aba_origem:     meta.aba,
+        tipo:           meta.tipo,
+        avaliado_id:    avaliadoId,
+        avaliado_nome:  avaliadoNome,
+        avaliador_id:   avaliadorId,
+        avaliador_nome: avaliadorNome,
+        scores,
+        dissertativas,
+        nota_geral_avaliador: notaGeralCol && row[notaGeralCol] ? Number(row[notaGeralCol]) : null,
+        media_calculada: media ? Math.round(media * 100) / 100 : null,
+        importado_em: new Date().toISOString()
+      };
+    });
+
+    for (let i = 0; i < docs.length; i += CHUNK) {
+      const batch = db.batch();
+      docs.slice(i, i+CHUNK).forEach(d => batch.set(db.collection('aval_respostas').doc(), d));
+      await batch.commit();
+    }
+
+    toast(`${docs.length} respostas importadas com sucesso!`);
+    closeAvalRevisaoModal();
+    await loadAvaliacao();
+    setAvalTab('ciclos');
+  } catch(e) {
+    toast('Erro: '+e.message,'e');
+  } finally {
+    btn.textContent = 'Confirmar Importação'; btn.disabled = false;
+  }
+}
+
+// ── Resultados ─────────────────────────────────────────────
+let _avalFiltroSiciclo = '';
+let _avalFiltroSiclo = '';
+let _avalFiltroSicloR = '';
+let _avalFiltroSiclo2 = '';
+let _avalFiltroSiclo3 = '';
+let _avalFiltroSiclo4 = '';
+let _avalFiltroSiclo5 = '';
+let _avalFiltroSicloFinal = '';
+let _avalFiltroSiclo6 = '';
+let _avalFiltroSiclo7 = '';
+let _avalFiltroSicloSel = '';
+let _avalFiltroSiclo8 = '';
+let _avalFiltroSicloA = '';
+let _avalFiltroSiclo9 = '';
+let _avalFiltroSicloB = '';
+let _avalFiltroSicloC = '';
+let _avalFiltroSicloSel2 = '';
+let _avalFiltroSicloSel3 = '';
+let _avalFiltroSicloSel4 = '';
+let _avalFiltroSicloSel5 = '';
+let _avalFiltroSicloSel6 = '';
+let _avalFiltroSicloSel7 = '';
+let _avalFiltroSicloSel8 = '';
+let _avalFiltroSicloSel9 = '';
+let _avalFiltroSicloSel10 = '';
+let _avalFiltroSel = '';
+let _avalFiltroSiclo10 = '';
+let _avalCicloSelecionado = '2025';
+
+function renderAvalResultados() {
+  const cicloOpts = AVAL_CICLOS_FIXOS.map(c =>
+    `<option value="${c.id}" ${c.id===_avalCicloSelecionado?'selected':''}>${c.nome}</option>`).join('');
+
+  // Calcular resultados para o ciclo selecionado
+  const respostasC = allAvalRespostas.filter(r => r.ciclo_id === _avalCicloSelecionado);
+  const manuaisC   = allAvalManuais.filter(m => m.ciclo_id === _avalCicloSelecionado);
+
+  // Agrupar por avaliado
+  const avaliadosMap = {};
+
+  respostasC.forEach(r => {
+    const key = r.avaliado_id || r.avaliado_nome;
+    if (!key) return;
+    if (!avaliadosMap[key]) avaliadosMap[key] = {
+      nome: r.avaliado_nome, id: r.avaliado_id,
+      principal: [], secundario: []
+    };
+    if (r.tipo === 'principal') avaliadosMap[key].principal.push(r);
+    else avaliadosMap[key].secundario.push(r);
+  });
+
+  manuaisC.forEach(m => {
+    const key = m.colaborador_id || m.colaborador_nome;
+    if (!key) return;
+    if (!avaliadosMap[key]) avaliadosMap[key] = {
+      nome: m.colaborador_nome, id: m.colaborador_id,
+      manual: m
+    };
+    else avaliadosMap[key].manual = m;
+  });
+
+  if (!Object.keys(avaliadosMap).length && !manuaisC.length) {
+    document.getElementById('avalWrap').innerHTML = `
+      <div style="margin-bottom:16px">
+        <select class="search-bar" style="width:120px" onchange="_avalCicloSelecionado=this.value;renderAvalResultados()">${cicloOpts}</select>
+      </div>
+      <div class="empty-state">Nenhuma avaliação encontrada para ${_avalCicloSelecionado}.</div>`;
+    return;
+  }
+
+  let rows = '';
+  Object.values(avaliadosMap).sort((a,b) => (a.nome||'').localeCompare(b.nome||'')).forEach(av => {
+    if (av.manual) {
+      // Avaliação manual (2023/2024)
+      const pdfLink = av.manual.pdf_url
+        ? `<a href="${av.manual.pdf_url}" target="_blank" class="btn btn-outline btn-sm">📄 PDF</a>` : '—';
+      rows += `<tr>
+        <td><b>${av.nome||'—'}</b></td>
+        <td style="text-align:center">—</td>
+        <td style="text-align:center">—</td>
+        <td style="text-align:center"><b style="font-size:16px;color:#0b4e7d">${av.manual.nota_final?.toFixed(1)||'—'}</b></td>
+        <td style="text-align:center"><span class="badge badge-orange">Manual</span></td>
+        <td style="text-align:center">${pdfLink}</td>
+        <td style="text-align:center"><button class="btn btn-outline btn-sm" onclick="openAvalManualModal('${av.manual.id}')">✏️</button></td>
+      </tr>`;
+    } else {
+      // Avaliação via Forms
+      const mediaPrinc = av.principal?.length
+        ? av.principal.reduce((s,r) => s+(r.media_calculada||0), 0) / av.principal.length : null;
+      const mediaSec = av.secundario?.length
+        ? av.secundario.reduce((s,r) => s+(r.media_calculada||0), 0) / av.secundario.length : null;
+
+      let notaFinal = null;
+      if (mediaPrinc != null && mediaSec != null)
+        notaFinal = mediaPrinc * 0.8 + mediaSec * 0.2;
+      else if (mediaPrinc != null) notaFinal = mediaPrinc;
+      else if (mediaSec != null) notaFinal = mediaSec;
+
+      const notaColor = notaFinal == null ? '#94a3b8' : notaFinal >= 4 ? '#15803d' : notaFinal >= 3 ? '#b45309' : '#b91c1c';
+      rows += `<tr>
+        <td><b>${av.nome||'—'}</b></td>
+        <td style="text-align:center">${mediaPrinc!=null?mediaPrinc.toFixed(2):'—'} <span style="font-size:10px;color:#94a3b8">(${av.principal?.length||0})</span></td>
+        <td style="text-align:center">${mediaSec!=null?mediaSec.toFixed(2):'—'} <span style="font-size:10px;color:#94a3b8">(${av.secundario?.length||0})</span></td>
+        <td style="text-align:center"><b style="font-size:16px;color:${notaColor}">${notaFinal!=null?notaFinal.toFixed(2):'—'}</b></td>
+        <td style="text-align:center"><span class="badge badge-blue">Forms</span></td>
+        <td style="text-align:center">—</td>
+        <td style="text-align:center"><button class="btn btn-outline btn-sm" onclick="verDetalheAval('${av.id||av.nome}','${_avalCicloSelecionado}')">🔍</button></td>
+      </tr>`;
+    }
+  });
+
+  document.getElementById('avalWrap').innerHTML = `
+    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+      <select class="search-bar" style="width:120px" onchange="_avalCicloSelecionado=this.value;renderAvalResultados()">${cicloOpts}</select>
+      <span style="font-size:12px;color:#64748b">${Object.keys(avaliadosMap).length} colaborador(es) avaliado(s)</span>
+      <button class="btn btn-outline btn-sm" onclick="openAvalManualModal(null)">+ Avaliação Manual</button>
+    </div>
+    <div style="overflow-x:auto">
+    <table class="table">
+      <thead><tr>
+        <th>Colaborador</th>
+        <th style="text-align:center">Nota Principal <span style="font-weight:400;color:#94a3b8">(80%)</span></th>
+        <th style="text-align:center">Nota Secundária <span style="font-weight:400;color:#94a3b8">(20%)</span></th>
+        <th style="text-align:center">Nota Final</th>
+        <th style="text-align:center">Tipo</th>
+        <th style="text-align:center">PDF</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${rows||'<tr><td colspan="7" class="empty-state">Nenhum resultado.</td></tr>'}</tbody>
+    </table>
+    </div>`;
+}
+
+function verDetalheAval(avaliadoKey, cicloId) {
+  const respostas = allAvalRespostas.filter(r =>
+    r.ciclo_id === cicloId && (r.avaliado_id === avaliadoKey || r.avaliado_nome === avaliadoKey)
+  );
+  if (!respostas.length) { toast('Sem respostas detalhadas.'); return; }
+
+  let html = `<div style="padding:20px">`;
+  respostas.forEach(r => {
+    html += `<div style="margin-bottom:20px;border:1px solid #e2e8f0;border-radius:10px;padding:16px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <b>${r.avaliador_nome||'Avaliador desconhecido'}</b>
+        <span class="badge ${r.tipo==='principal'?'badge-blue':'badge-orange'}">${r.tipo==='principal'?'Principal 80%':'Secundário 20%'}</span>
+      </div>`;
+
+    if (Object.keys(r.scores||{}).length) {
+      html += `<div style="margin-bottom:10px">`;
+      Object.entries(r.scores).forEach(([q,v]) => {
+        const pct = (v/5)*100;
+        html += `<div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span style="color:#334155">${q}</span><b>${v}/5</b>
+          </div>
+          <div style="height:6px;background:#e2e8f0;border-radius:3px">
+            <div style="width:${pct}%;height:100%;background:${pct>=80?'#15803d':pct>=60?'#b45309':'#b91c1c'};border-radius:3px"></div>
+          </div>
+        </div>`;
+      });
+      html += `</div><p style="font-size:13px;color:#0b4e7d;font-weight:600">Média: ${r.media_calculada?.toFixed(2)||'—'}</p>`;
+    }
+
+    if (Object.keys(r.dissertativas||{}).length) {
+      html += `<div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px">`;
+      Object.entries(r.dissertativas).forEach(([q,v]) => {
+        html += `<div style="margin-bottom:8px"><b style="font-size:11px;color:#64748b;text-transform:uppercase">${q}</b><p style="font-size:13px;color:#334155;margin-top:4px">${v}</p></div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  // Abrir em modal de detalhe — reutiliza o modal de revisão como visualizador
+  document.getElementById('avalRevisaoWrap').innerHTML = html;
+  document.getElementById('avalRevisaoInfo').textContent = `${respostas.length} avaliador(es)`;
+  document.getElementById('btnConfirmarImportacao').style.display = 'none';
+  document.getElementById('avalRevisaoModal').classList.add('open');
+}
+
+// Restaurar botão ao fechar
+const _origCloseRevisao = closeAvalRevisaoModal;
+function closeAvalRevisaoModal() {
+  document.getElementById('avalRevisaoModal').classList.remove('open');
+  document.getElementById('btnConfirmarImportacao').style.display = '';
 }
 
 // ══ PLANO DE CARREIRA ══════════════════════════════════════
