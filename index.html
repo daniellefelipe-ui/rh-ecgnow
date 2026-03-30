@@ -1415,8 +1415,8 @@
         <select class="form-input" id="avalManualCiclo"></select>
       </div>
       <div class="form-group">
-        <label class="form-label">Nota Final (0–5) *</label>
-        <input type="number" class="form-input" id="avalManualNota" min="0" max="5" step="0.1" placeholder="ex: 4.2">
+        <label class="form-label">Nota Final (%) *</label>
+        <input type="number" class="form-input" id="avalManualNota" min="0" max="100" step="0.1" placeholder="ex: 85.5">
       </div>
       <div class="form-group">
         <label class="form-label">PDF (opcional)</label>
@@ -5527,7 +5527,7 @@ async function saveAvalManual() {
   const pdfFile  = document.getElementById('avalManualPdf').files[0];
   const editId   = document.getElementById('avalManualId').value;
 
-  if (!colabId || !cicloId || isNaN(nota)) { toast('Preencha colaborador, ciclo e nota.','e'); return; }
+  if (!colabId || !cicloId || isNaN(nota) || nota < 0 || nota > 100) { toast('Preencha colaborador, ciclo e nota (0–100).','e'); return; }
   const colab = allColabs.find(c => c.id === colabId) || {};
 
   const btn = document.getElementById('btnSaveAvalManual');
@@ -5821,7 +5821,7 @@ function renderAvalResultados() {
         <td><b>${av.nome||'—'}</b></td>
         <td style="text-align:center">—</td>
         <td style="text-align:center">—</td>
-        <td style="text-align:center"><b style="font-size:16px;color:#0b4e7d">${av.manual.nota_final?.toFixed(1)||'—'}</b></td>
+        <td style="text-align:center"><b style="font-size:16px;color:#0b4e7d">${av.manual.nota_final!=null?av.manual.nota_final.toFixed(1)+'%':'—'}</b></td>
         <td style="text-align:center"><span class="badge badge-orange">Manual</span></td>
         <td style="text-align:center">${pdfLink}</td>
         <td style="text-align:center"><button class="btn btn-outline btn-sm" onclick="openAvalManualModal('${av.manual.id}')">✏️</button></td>
@@ -5839,12 +5839,15 @@ function renderAvalResultados() {
       else if (mediaPrinc != null) notaFinal = mediaPrinc;
       else if (mediaSec != null) notaFinal = mediaSec;
 
-      const notaColor = notaFinal == null ? '#94a3b8' : notaFinal >= 4 ? '#15803d' : notaFinal >= 3 ? '#b45309' : '#b91c1c';
+      const pctPrinc = mediaPrinc != null ? mediaPrinc / 5 * 100 : null;
+      const pctSec   = mediaSec   != null ? mediaSec   / 5 * 100 : null;
+      const pctFinal = notaFinal  != null ? notaFinal  / 5 * 100 : null;
+      const notaColor = pctFinal == null ? '#94a3b8' : pctFinal >= 80 ? '#15803d' : pctFinal >= 60 ? '#b45309' : '#b91c1c';
       rows += `<tr>
         <td><b>${av.nome||'—'}</b></td>
-        <td style="text-align:center">${mediaPrinc!=null?mediaPrinc.toFixed(2):'—'} <span style="font-size:10px;color:#94a3b8">(${av.principal?.length||0})</span></td>
-        <td style="text-align:center">${mediaSec!=null?mediaSec.toFixed(2):'—'} <span style="font-size:10px;color:#94a3b8">(${av.secundario?.length||0})</span></td>
-        <td style="text-align:center"><b style="font-size:16px;color:${notaColor}">${notaFinal!=null?notaFinal.toFixed(2):'—'}</b></td>
+        <td style="text-align:center">${pctPrinc!=null?pctPrinc.toFixed(1)+'%':'—'} <span style="font-size:10px;color:#94a3b8">(${av.principal?.length||0})</span></td>
+        <td style="text-align:center">${pctSec!=null?pctSec.toFixed(1)+'%':'—'} <span style="font-size:10px;color:#94a3b8">(${av.secundario?.length||0})</span></td>
+        <td style="text-align:center"><b style="font-size:16px;color:${notaColor}">${pctFinal!=null?pctFinal.toFixed(1)+'%':'—'}</b></td>
         <td style="text-align:center"><span class="badge badge-blue">Forms</span></td>
         <td style="text-align:center">—</td>
         <td style="text-align:center"><button class="btn btn-outline btn-sm" onclick="verDetalheAval('${av.id||av.nome}','${_avalCicloSelecionado}')">🔍</button></td>
@@ -5894,14 +5897,14 @@ function verDetalheAval(avaliadoKey, cicloId) {
         const pct = (v/5)*100;
         html += `<div style="margin-bottom:6px">
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-            <span style="color:#334155">${q}</span><b>${v}/5</b>
+            <span style="color:#334155">${q}</span><b>${(v/5*100).toFixed(0)}%</b>
           </div>
           <div style="height:6px;background:#e2e8f0;border-radius:3px">
             <div style="width:${pct}%;height:100%;background:${pct>=80?'#15803d':pct>=60?'#b45309':'#b91c1c'};border-radius:3px"></div>
           </div>
         </div>`;
       });
-      html += `</div><p style="font-size:13px;color:#0b4e7d;font-weight:600">Média: ${r.media_calculada?.toFixed(2)||'—'}</p>`;
+      html += `</div><p style="font-size:13px;color:#0b4e7d;font-weight:600">Média: ${r.media_calculada!=null?(r.media_calculada/5*100).toFixed(1)+'%':'—'}</p>`;
     }
 
     if (Object.keys(r.dissertativas||{}).length) {
