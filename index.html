@@ -5562,6 +5562,12 @@ function renderPlanoRadar() {
   document.getElementById('planoTabActions').innerHTML =
     `<button class="btn btn-primary btn-sm" onclick="openRadarModal(null)">+ Adicionar</button>`;
 
+  const colabsRadar = allColabs.filter(c => {
+    if (!/^ativ/i.test(c.status || 'ativo')) return false;
+    if (/médic|medic/i.test(c.cargo || '')) return false;
+    return true;
+  });
+
   if (!colabsRadar.length) {
     document.getElementById('planoWrap').innerHTML = '<div class="empty-state">Nenhum colaborador ativo encontrado.</div>';
     return;
@@ -5571,12 +5577,6 @@ function renderPlanoRadar() {
   allPlanoRadar.forEach(r => radarMap[r.colaborador_id] = r);
 
   const prontoLabel = { sim:'<span class="badge badge-green">Sim</span>', desenvolvimento:'<span class="badge badge-blue">Em dev.</span>', nao:'<span class="badge badge-red">Não</span>' };
-
-  const colabsRadar = allColabs.filter(c => {
-    if (!/^ativ/i.test(c.status || 'ativo')) return false;
-    if (/médic|medic/i.test(c.cargo || '')) return false;
-    return true;
-  });
 
   let rows = '';
   colabsRadar.forEach(c => {
