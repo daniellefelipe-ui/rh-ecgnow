@@ -5471,7 +5471,7 @@ function renderAvalCiclos() {
       <td style="text-align:center">${respostas.length}</td>
       <td style="text-align:center">${manuais.length}</td>
       <td style="text-align:center">
-        <button class="btn btn-outline btn-sm" onclick="setAvalTab('resultados');_avalFiltroSciclo='${c.id}';renderAvalResultados()">Ver Resultados</button>
+        <button class="btn btn-outline btn-sm" onclick="setAvalTab('resultados');_avalCicloSelecionado='${c.id}';renderAvalResultados()">Ver Resultados</button>
       </td>
     </tr>`;
   });
@@ -5565,7 +5565,6 @@ async function saveAvalManual() {
 }
 
 // ── Importar ───────────────────────────────────────────────
-let _avalFiltroSiciclo = '';
 function renderAvalImportar() {
   const cicloOpts = AVAL_CICLOS_FIXOS.map(c =>
     `<option value="${c.id}">${c.nome}</option>`).join('');
@@ -5769,33 +5768,6 @@ async function confirmarImportacaoAval() {
 }
 
 // ── Resultados ─────────────────────────────────────────────
-let _avalFiltroSiciclo = '';
-let _avalFiltroSiclo = '';
-let _avalFiltroSicloR = '';
-let _avalFiltroSiclo2 = '';
-let _avalFiltroSiclo3 = '';
-let _avalFiltroSiclo4 = '';
-let _avalFiltroSiclo5 = '';
-let _avalFiltroSicloFinal = '';
-let _avalFiltroSiclo6 = '';
-let _avalFiltroSiclo7 = '';
-let _avalFiltroSicloSel = '';
-let _avalFiltroSiclo8 = '';
-let _avalFiltroSicloA = '';
-let _avalFiltroSiclo9 = '';
-let _avalFiltroSicloB = '';
-let _avalFiltroSicloC = '';
-let _avalFiltroSicloSel2 = '';
-let _avalFiltroSicloSel3 = '';
-let _avalFiltroSicloSel4 = '';
-let _avalFiltroSicloSel5 = '';
-let _avalFiltroSicloSel6 = '';
-let _avalFiltroSicloSel7 = '';
-let _avalFiltroSicloSel8 = '';
-let _avalFiltroSicloSel9 = '';
-let _avalFiltroSicloSel10 = '';
-let _avalFiltroSel = '';
-let _avalFiltroSiclo10 = '';
 let _avalCicloSelecionado = '2025';
 
 function renderAvalResultados() {
