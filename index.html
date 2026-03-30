@@ -5323,12 +5323,12 @@ let _radarEditId = null;
 async function loadPlano() {
   try {
     const [snN, snC, snF, snR] = await Promise.all([
-      db.collection('plano_niveis').orderBy('nivel').get(),
+      db.collection('plano_niveis').get(),
       db.collection('plano_criterios').get(),
       db.collection('plano_faixas').get(),
       db.collection('progresso_colaborador').get()
     ]);
-    allPlanoNiveis    = snN.docs.map(d => ({id:d.id,...d.data()}));
+    allPlanoNiveis    = snN.docs.map(d => ({id:d.id,...d.data()})).sort((a,b) => (a.area||'').localeCompare(b.area||'') || (a.nivel||0)-(b.nivel||0));
     allPlanoCriterios = snC.docs.map(d => ({id:d.id,...d.data()}));
     allPlanoFaixas    = snF.docs.map(d => ({id:d.id,...d.data()}));
     allPlanoRadar     = snR.docs.map(d => ({id:d.id,...d.data()}));
@@ -5380,23 +5380,28 @@ function renderPlanoMapa() {
     return;
   }
 
+  const trunc = (s, n) => (s||'').length > n ? (s||'').slice(0,n)+'…' : (s||'—');
+
   let rows = '';
   filtered.forEach(n => {
-    const escopo = (n.escopo||'').length > 80 ? (n.escopo||'').slice(0,80)+'…' : (n.escopo||'—');
-    rows += `<tr style="cursor:pointer" onclick="togglePlanoNivelDetalhe('${n.id}', this)">
-      <td><span class="badge badge-blue">${n.nivel != null ? n.nivel : '—'}</span></td>
+    rows += `<tr style="cursor:pointer" onclick="togglePlanoNivelDetalhe('${n.id}', this)" title="Clique para ver detalhes completos">
+      <td style="text-align:center"><span class="badge badge-blue">${n.nivel != null ? n.nivel : '—'}</span></td>
       <td><b>${n.cargo||'—'}</b></td>
       <td>${n.area||'—'}</td>
       <td><span class="badge badge-orange">${n.trilha||'—'}</span></td>
-      <td style="color:#64748b;font-size:12px">${escopo}</td>
+      <td style="color:#64748b;font-size:12px;max-width:200px">${trunc(n.escopo,60)}</td>
+      <td style="color:#64748b;font-size:12px;max-width:160px">${trunc(n.comp_tecnicas,50)}</td>
+      <td style="color:#64748b;font-size:12px;max-width:160px">${trunc(n.comp_comportamentais,50)}</td>
+      <td style="color:#64748b;font-size:12px">${n.autonomia||'—'}</td>
+      <td style="color:#64748b;font-size:12px;max-width:160px">${trunc(n.proximos_movimentos,50)}</td>
     </tr>
     <tr id="plano-detalhe-${n.id}" style="display:none">
-      <td colspan="5" style="background:#f8fafc;padding:16px 20px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;font-size:13px">
-          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Escopo / Responsabilidades</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap">${n.escopo||'—'}</p></div>
+      <td colspan="9" style="background:#f0f7ff;padding:16px 20px;border-left:3px solid #1a8fe3">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 32px;font-size:13px">
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Escopo / Responsabilidades</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap;line-height:1.6">${n.escopo||'—'}</p></div>
           <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Tipo de Autonomia</b><p style="margin-top:6px;color:#334155">${n.autonomia||'—'}</p></div>
-          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Competências Técnicas</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap">${n.comp_tecnicas||'—'}</p></div>
-          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Competências Comportamentais</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap">${n.comp_comportamentais||'—'}</p></div>
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Competências Técnicas</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap;line-height:1.6">${n.comp_tecnicas||'—'}</p></div>
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Competências Comportamentais</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap;line-height:1.6">${n.comp_comportamentais||'—'}</p></div>
           <div style="grid-column:1/-1"><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Próximos Movimentos Possíveis</b><p style="margin-top:6px;color:#334155">${n.proximos_movimentos||'—'}</p></div>
         </div>
       </td>
@@ -5404,22 +5409,23 @@ function renderPlanoMapa() {
   });
 
   document.getElementById('planoWrap').innerHTML = `
-    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
       <select class="search-bar" style="width:200px" onchange="_planoMapaFiltroTrilha=this.value;renderPlanoMapa()">${opTrilhas}</select>
       <select class="search-bar" style="width:200px" onchange="_planoMapaFiltroArea=this.value;renderPlanoMapa()">${opAreas}</select>
-      <span style="align-self:center;font-size:12px;color:#64748b">${filtered.length} nível(is)</span>
+      <span style="font-size:12px;color:#64748b">${filtered.length} nível(is) · clique em uma linha para ver detalhes completos</span>
     </div>
     <div style="overflow-x:auto">
     <table class="table">
       <thead><tr>
-        <th>Nível</th><th>Cargo</th><th>Área</th><th>Trilha</th><th>Escopo</th>
+        <th style="text-align:center">Nível</th><th>Cargo</th><th>Área</th><th>Trilha</th>
+        <th>Escopo</th><th>Comp. Técnicas</th><th>Comp. Comportamentais</th><th>Autonomia</th><th>Próximos Movimentos</th>
       </tr></thead>
-      <tbody>${rows||'<tr><td colspan="5" class="empty-state">Nenhum resultado.</td></tr>'}</tbody>
+      <tbody>${rows||'<tr><td colspan="9" class="empty-state">Nenhum resultado.</td></tr>'}</tbody>
     </table>
     </div>`;
 }
 
-function togglePlanoNivelDetalhe(id, tr) {
+function togglePlanoNivelDetalhe(id) {
   const det = document.getElementById('plano-detalhe-' + id);
   if (!det) return;
   const isOpen = det.style.display !== 'none';
@@ -5746,6 +5752,14 @@ function _numOrNull(v) {
   return (v !== '' && v != null && !isNaN(n)) ? n : null;
 }
 
+function _parseSalario(v) {
+  if (v === '' || v == null) return null;
+  // Remove R$, espaços, pontos de milhar; troca vírgula decimal por ponto
+  const s = String(v).replace(/R\$\s*/g,'').replace(/\./g,'').replace(',','.').trim();
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
 function _normKey(s) {
   return (s||'').toString().replace(/^\uFEFF/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
 }
@@ -5769,14 +5783,14 @@ function _parseCSV(file) {
     const reader = new FileReader();
     reader.onload = e => {
       try {
-        const wb = XLSX.read(e.target.result, {type:'array', raw:false});
+        const wb = XLSX.read(e.target.result, {type:'string', raw:false});
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
         resolve(rows);
       } catch(err) { reject(err); }
     };
     reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
+    reader.readAsText(file, 'UTF-8');
   });
 }
 
@@ -5838,9 +5852,9 @@ async function confirmarImport(tipo) {
         escopo:         String(_col(row,'Escopo')),
         comp_tecnicas:  String(_col(row,'Competências Técnicas','Competencias Tecnicas')),
         comp_comportamentais: String(_col(row,'Comp. Comportamentais','Competencias Comportamentais')),
-        minimo:         _numOrNull(String(_col(row,'Mínimo','Minimo')).replace(/[^0-9.,]/g,'').replace(',','.')),
-        medio:          _numOrNull(String(_col(row,'Médio','Medio')).replace(/[^0-9.,]/g,'').replace(',','.')),
-        maximo:         _numOrNull(String(_col(row,'Máximo','Maximo')).replace(/[^0-9.,]/g,'').replace(',','.')),
+        minimo:         _parseSalario(_col(row,'Mínimo','Minimo')),
+        medio:          _parseSalario(_col(row,'Médio','Medio')),
+        maximo:         _parseSalario(_col(row,'Máximo','Maximo')),
         variavel:       varVal === 'sim' || varVal === 'yes' || varVal === 'true'
       };
     }
