@@ -1377,6 +1377,47 @@
   </div>
 </div>
 
+<!-- MODAL FAIXA SALARIAL -->
+<div class="modal-overlay" id="faixaModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <span class="modal-title">Editar Faixa Salarial</span>
+      <button class="modal-close" onclick="closeFaixaModal()">×</button>
+    </div>
+    <input type="hidden" id="faixaId">
+    <p id="faixaInfo" style="font-size:13px;color:#64748b;margin-bottom:20px;font-weight:600"></p>
+    <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px">
+      <div class="form-group">
+        <label class="form-label">Mínimo (R$)</label>
+        <input type="number" class="form-input" id="faixaMinimo" placeholder="ex: 2500">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Médio (R$)</label>
+        <input type="number" class="form-input" id="faixaMedio" placeholder="ex: 3000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Máximo (R$)</label>
+        <input type="number" class="form-input" id="faixaMaximo" placeholder="ex: 3500">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Variável?</label>
+        <select class="form-input" id="faixaVariavel">
+          <option value="nao">Não</option>
+          <option value="sim">Sim</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Tipo de Contrato</label>
+        <input type="text" class="form-input" id="faixaTipoContrato" placeholder="ex: CLT, PJ">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeFaixaModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveFaixaModal()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL RADAR -->
 <div class="modal-overlay" id="radarModal">
   <div class="modal" style="width:680px;max-height:92vh;display:flex;flex-direction:column">
@@ -5459,6 +5500,7 @@ function renderPlanoFaixas() {
       <td style="text-align:right">${med}</td>
       <td style="text-align:right">${max}</td>
       <td style="text-align:center">${f.variavel==='sim'||f.variavel===true?'<span class="badge badge-green">Sim</span>':'<span class="badge badge-red">Não</span>'}</td>
+      <td style="text-align:center"><button class="btn btn-outline btn-sm" onclick="openFaixaModal('${f.id}')">✏️</button></td>
     </tr>`;
   });
 
@@ -5467,11 +5509,46 @@ function renderPlanoFaixas() {
     <table class="table">
       <thead><tr>
         <th>Nível</th><th>Cargo</th><th>Área</th><th>Trilha</th><th>Contrato</th>
-        <th style="text-align:right">Mínimo</th><th style="text-align:right">Médio</th><th style="text-align:right">Máximo</th><th style="text-align:center">Variável?</th>
+        <th style="text-align:right">Mínimo</th><th style="text-align:right">Médio</th><th style="text-align:right">Máximo</th><th style="text-align:center">Variável?</th><th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
     </div>`;
+}
+
+function openFaixaModal(id) {
+  const f = allPlanoFaixas.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('faixaId').value        = id;
+  document.getElementById('faixaInfo').textContent = `Nível ${f.nivel} — ${f.cargo} (${f.area})`;
+  document.getElementById('faixaMinimo').value     = f.minimo  || '';
+  document.getElementById('faixaMedio').value      = f.medio   || '';
+  document.getElementById('faixaMaximo').value     = f.maximo  || '';
+  document.getElementById('faixaVariavel').value   = (f.variavel === true || f.variavel === 'sim') ? 'sim' : 'nao';
+  document.getElementById('faixaTipoContrato').value = f.tipo_contrato || '';
+  document.getElementById('faixaModal').classList.add('open');
+}
+
+function closeFaixaModal() {
+  document.getElementById('faixaModal').classList.remove('open');
+}
+
+async function saveFaixaModal() {
+  const id = document.getElementById('faixaId').value;
+  const data = {
+    minimo:        parseFloat(document.getElementById('faixaMinimo').value) || null,
+    medio:         parseFloat(document.getElementById('faixaMedio').value)  || null,
+    maximo:        parseFloat(document.getElementById('faixaMaximo').value) || null,
+    variavel:      document.getElementById('faixaVariavel').value === 'sim',
+    tipo_contrato: document.getElementById('faixaTipoContrato').value.trim()
+  };
+  try {
+    await db.collection('plano_faixas').doc(id).update(data);
+    toast('Faixa salarial atualizada!');
+    closeFaixaModal();
+    await loadPlano();
+    setPlanoTab('faixas');
+  } catch(e) { toast('Erro: '+e.message, 'e'); }
 }
 
 // ── Radar de Talentos ──────────────────────────────────────
