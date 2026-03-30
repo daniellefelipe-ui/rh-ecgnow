@@ -202,6 +202,7 @@
         <button class="nav-item" onclick="showSection('esat',this)">⭐ &nbsp;e-SAT</button>
         <button class="nav-item" onclick="showSection('ferias',this)">🏖 &nbsp;Férias</button>
         <button class="nav-item" onclick="showSection('cargos',this)">📄 &nbsp;Cargos</button>
+        <button class="nav-item" onclick="showSection('plano',this)">🗺️ &nbsp;Plano de Carreira</button>
       </nav>
     </div>
     <div class="sb-footer">
@@ -608,6 +609,27 @@
           </div>
         </div>
         <div id="cargoDetalheWrap" style="padding:8px 0"></div>
+      </div>
+    </section>
+
+    <!-- ══ PLANO DE CARREIRA ═══════════════════════════════ -->
+    <section class="page-section" id="sec-plano">
+      <div class="page-header"><h1>Plano de Carreira</h1></div>
+      <div class="kpi-grid" id="planoKpis">
+        <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline" id="planoTab-mapa"      onclick="setPlanoTab('mapa',this)">🗺️ Mapa de Carreiras</button>
+            <button class="btn btn-outline" id="planoTab-criterios" onclick="setPlanoTab('criterios',this)">📋 Critérios de Promoção</button>
+            <button class="btn btn-outline" id="planoTab-faixas"    onclick="setPlanoTab('faixas',this)">💰 Faixas Salariais</button>
+            <button class="btn btn-outline" id="planoTab-radar"     onclick="setPlanoTab('radar',this)">📡 Radar de Talentos</button>
+            <button class="btn btn-outline" id="planoTab-importar"  onclick="setPlanoTab('importar',this)">📥 Importar Dados</button>
+          </div>
+          <div id="planoTabActions" style="display:flex;gap:8px;align-items:center"></div>
+        </div>
+        <div id="planoWrap"><div class="empty-state">Selecione uma aba acima.</div></div>
       </div>
     </section>
   </main>
@@ -1355,6 +1377,102 @@
   </div>
 </div>
 
+<!-- MODAL RADAR -->
+<div class="modal-overlay" id="radarModal">
+  <div class="modal" style="width:680px;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <span class="modal-title" id="radarModalTitle">Painel de Progresso</span>
+      <button class="modal-close" onclick="closeRadarModal()">×</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:20px 24px">
+      <input type="hidden" id="radarColabId">
+      <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px">
+        <div class="form-group">
+          <label class="form-label">Colaborador</label>
+          <input type="text" class="form-input" id="radarNome" readonly style="background:#f8fafc">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Área</label>
+          <input type="text" class="form-input" id="radarArea" readonly style="background:#f8fafc">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Trilha</label>
+          <select class="form-input" id="radarTrilha" onchange="populateRadarNiveis()">
+            <option value="">Selecione</option>
+            <option>Suporte Operacional</option>
+            <option>Técnica</option>
+            <option>Especialista</option>
+            <option>Gestão/Liderança</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nível Atual</label>
+          <select class="form-input" id="radarNivel">
+            <option value="">Selecione a trilha primeiro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cargo Atual</label>
+          <input type="text" class="form-input" id="radarCargo" placeholder="Cargo atual">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Última Promoção</label>
+          <input type="date" class="form-input" id="radarUltimaPromocao">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Performance (%)</label>
+          <input type="number" class="form-input" id="radarPerformance" placeholder="ex: 85" min="0" max="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-SAT (%)</label>
+          <input type="number" class="form-input" id="radarEsat" placeholder="ex: 90" min="0" max="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">PDI (%)</label>
+          <input type="number" class="form-input" id="radarPdi" placeholder="ex: 70" min="0" max="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pronto para Promoção?</label>
+          <select class="form-input" id="radarPronto">
+            <option value="">Selecione</option>
+            <option value="sim">Sim</option>
+            <option value="desenvolvimento">Em desenvolvimento</option>
+            <option value="nao">Não</option>
+          </select>
+        </div>
+        <div class="form-group full" style="grid-column:1/-1">
+          <label class="form-label">Aceleradores Ativos</label>
+          <input type="text" class="form-input" id="radarAceleradores" placeholder="ex: Liderança de Projetos, Mentoria">
+        </div>
+        <div class="form-group full" style="grid-column:1/-1">
+          <label class="form-label">Próxima Meta</label>
+          <input type="text" class="form-input" id="radarMeta" placeholder="ex: Atingir nível 8 até dez/2026">
+        </div>
+        <div class="form-group full" style="grid-column:1/-1">
+          <label class="form-label">Potencial Futuro</label>
+          <input type="text" class="form-input" id="radarPotencial" placeholder="ex: Especialista Sênior ou Gestão">
+        </div>
+        <div class="form-group full" style="grid-column:1/-1">
+          <label class="form-label">Ação Recomendada pelo RH</label>
+          <input type="text" class="form-input" id="radarAcao" placeholder="ex: Acelerar PDI, nomear para projeto estratégico">
+        </div>
+        <div class="form-group full" style="grid-column:1/-1">
+          <label class="form-label">Riscos</label>
+          <input type="text" class="form-input" id="radarRiscos" placeholder="ex: Risco de saída, engajamento em queda">
+        </div>
+        <div class="form-group full" style="grid-column:1/-1">
+          <label class="form-label">Observações</label>
+          <textarea class="form-input" id="radarObs" rows="3" placeholder="Observações gerais sobre o colaborador"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="form-actions" style="flex-shrink:0;padding:16px 24px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;gap:10px">
+      <button class="btn btn-outline" onclick="closeRadarModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRadarModal()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1574,6 +1692,7 @@ async function loadAll() {
   await loadEsat();
   await loadFerias();
   await loadCargos();
+  await loadPlano();
   buildDashboard();
 }
 
@@ -5152,6 +5271,520 @@ async function deleteCargoFromModal() {
     document.getElementById('cargoDetalheCard').style.display = 'none';
     await loadCargos();
   } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+// ══ PLANO DE CARREIRA ══════════════════════════════════════
+let allPlanoNiveis = [], allPlanoCriterios = [], allPlanoFaixas = [], allPlanoRadar = [];
+let _planoTab = 'mapa';
+let _planoMapaFiltroTrilha = '', _planoMapaFiltroArea = '';
+let _radarEditId = null;
+
+async function loadPlano() {
+  try {
+    const [snN, snC, snF, snR] = await Promise.all([
+      db.collection('plano_niveis').orderBy('nivel').get(),
+      db.collection('plano_criterios').get(),
+      db.collection('plano_faixas').get(),
+      db.collection('progresso_colaborador').get()
+    ]);
+    allPlanoNiveis    = snN.docs.map(d => ({id:d.id,...d.data()}));
+    allPlanoCriterios = snC.docs.map(d => ({id:d.id,...d.data()}));
+    allPlanoFaixas    = snF.docs.map(d => ({id:d.id,...d.data()}));
+    allPlanoRadar     = snR.docs.map(d => ({id:d.id,...d.data()}));
+    buildPlanoKpis();
+    setPlanoTab(_planoTab);
+  } catch(e) { console.error('loadPlano:', e); }
+}
+
+function buildPlanoKpis() {
+  const trilhas = [...new Set(allPlanoNiveis.map(n => n.trilha).filter(Boolean))];
+  const areas   = [...new Set(allPlanoNiveis.map(n => n.area).filter(Boolean))];
+  document.getElementById('planoKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-lbl">Níveis Cadastrados</div><div class="kpi-val">${allPlanoNiveis.length}</div><div class="kpi-sub">${trilhas.length} trilhas · ${areas.length} áreas</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Critérios de Promoção</div><div class="kpi-val">${allPlanoCriterios.length}</div><div class="kpi-sub">transições mapeadas</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Faixas Salariais</div><div class="kpi-val">${allPlanoFaixas.length}</div><div class="kpi-sub">registros</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Radar de Talentos</div><div class="kpi-val">${allPlanoRadar.length}</div><div class="kpi-sub">colaboradores mapeados</div></div>
+  `;
+}
+
+function setPlanoTab(tab, btn) {
+  _planoTab = tab;
+  document.querySelectorAll('[id^="planoTab-"]').forEach(b => {
+    b.classList.remove('btn-primary');
+    b.classList.add('btn-outline');
+  });
+  const active = btn || document.getElementById('planoTab-' + tab);
+  if (active) { active.classList.remove('btn-outline'); active.classList.add('btn-primary'); }
+  document.getElementById('planoTabActions').innerHTML = '';
+  if (tab === 'mapa')      renderPlanoMapa();
+  else if (tab === 'criterios') renderPlanoCriterios();
+  else if (tab === 'faixas')    renderPlanoFaixas();
+  else if (tab === 'radar')     renderPlanoRadar();
+  else if (tab === 'importar')  renderPlanoImportar();
+}
+
+// ── Mapa de Carreiras ──────────────────────────────────────
+function renderPlanoMapa() {
+  const trilhas = [...new Set(allPlanoNiveis.map(n => n.trilha).filter(Boolean))].sort();
+  const areas   = [...new Set(allPlanoNiveis.map(n => n.area).filter(Boolean))].sort();
+  const filtered = allPlanoNiveis.filter(n =>
+    (!_planoMapaFiltroTrilha || n.trilha === _planoMapaFiltroTrilha) &&
+    (!_planoMapaFiltroArea   || n.area   === _planoMapaFiltroArea)
+  );
+  const opTrilhas = '<option value="">Todas as trilhas</option>' + trilhas.map(t => `<option ${t===_planoMapaFiltroTrilha?'selected':''}>${t}</option>`).join('');
+  const opAreas   = '<option value="">Todas as áreas</option>'   + areas.map(a => `<option ${a===_planoMapaFiltroArea?'selected':''}>${a}</option>`).join('');
+
+  if (!allPlanoNiveis.length) {
+    document.getElementById('planoWrap').innerHTML = '<div class="empty-state">Nenhum nível cadastrado. Importe os dados na aba <b>Importar Dados</b>.</div>';
+    return;
+  }
+
+  let rows = '';
+  filtered.forEach(n => {
+    const escopo = (n.escopo||'').length > 80 ? (n.escopo||'').slice(0,80)+'…' : (n.escopo||'—');
+    rows += `<tr style="cursor:pointer" onclick="togglePlanoNivelDetalhe('${n.id}', this)">
+      <td><span class="badge badge-blue">${n.nivel||'—'}</span></td>
+      <td><b>${n.cargo||'—'}</b></td>
+      <td>${n.area||'—'}</td>
+      <td><span class="badge badge-orange">${n.trilha||'—'}</span></td>
+      <td style="color:#64748b;font-size:12px">${escopo}</td>
+    </tr>
+    <tr id="plano-detalhe-${n.id}" style="display:none">
+      <td colspan="5" style="background:#f8fafc;padding:16px 20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;font-size:13px">
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Escopo / Responsabilidades</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap">${n.escopo||'—'}</p></div>
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Tipo de Autonomia</b><p style="margin-top:6px;color:#334155">${n.autonomia||'—'}</p></div>
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Competências Técnicas</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap">${n.comp_tecnicas||'—'}</p></div>
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Competências Comportamentais</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap">${n.comp_comportamentais||'—'}</p></div>
+          <div style="grid-column:1/-1"><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Próximos Movimentos Possíveis</b><p style="margin-top:6px;color:#334155">${n.proximos_movimentos||'—'}</p></div>
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  document.getElementById('planoWrap').innerHTML = `
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <select class="search-bar" style="width:200px" onchange="_planoMapaFiltroTrilha=this.value;renderPlanoMapa()">${opTrilhas}</select>
+      <select class="search-bar" style="width:200px" onchange="_planoMapaFiltroArea=this.value;renderPlanoMapa()">${opAreas}</select>
+      <span style="align-self:center;font-size:12px;color:#64748b">${filtered.length} nível(is)</span>
+    </div>
+    <div style="overflow-x:auto">
+    <table class="table">
+      <thead><tr>
+        <th>Nível</th><th>Cargo</th><th>Área</th><th>Trilha</th><th>Escopo</th>
+      </tr></thead>
+      <tbody>${rows||'<tr><td colspan="5" class="empty-state">Nenhum resultado.</td></tr>'}</tbody>
+    </table>
+    </div>`;
+}
+
+function togglePlanoNivelDetalhe(id, tr) {
+  const det = document.getElementById('plano-detalhe-' + id);
+  if (!det) return;
+  const isOpen = det.style.display !== 'none';
+  document.querySelectorAll('[id^="plano-detalhe-"]').forEach(r => r.style.display = 'none');
+  if (!isOpen) det.style.display = '';
+}
+
+// ── Critérios de Promoção ──────────────────────────────────
+function renderPlanoCriterios() {
+  if (!allPlanoCriterios.length) {
+    document.getElementById('planoWrap').innerHTML = '<div class="empty-state">Nenhum critério cadastrado. Importe os dados na aba <b>Importar Dados</b>.</div>';
+    return;
+  }
+  const sorted = [...allPlanoCriterios].sort((a,b) => (a.area||'').localeCompare(b.area||'') || (a.de_nivel||0)-(b.de_nivel||0));
+  let rows = '';
+  sorted.forEach(c => {
+    rows += `<tr style="cursor:pointer" onclick="togglePlanoCriterioDetalhe('${c.id}', this)">
+      <td>${c.area||'—'}</td>
+      <td><span class="badge badge-orange">${c.trilha||'—'}</span></td>
+      <td style="text-align:center"><span class="badge badge-blue">${c.de_nivel||'—'}</span></td>
+      <td style="text-align:center">→</td>
+      <td style="text-align:center"><span class="badge badge-green">${c.para_nivel||'—'}</span></td>
+      <td style="text-align:center">${c.avaliacao_pct!=null?c.avaliacao_pct+'%':'—'}</td>
+      <td style="text-align:center">${c.esat!=null?c.esat+'%':'—'}</td>
+      <td style="text-align:center">${c.pdi_pct!=null?c.pdi_pct+'%':'—'}</td>
+    </tr>
+    <tr id="plano-crit-detalhe-${c.id}" style="display:none">
+      <td colspan="8" style="background:#f8fafc;padding:16px 20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;font-size:13px">
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Entregas Necessárias</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap">${c.entregas||'—'}</p></div>
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Comportamentos Esperados</b><p style="margin-top:6px;color:#334155;white-space:pre-wrap">${c.comportamentos||'—'}</p></div>
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Visibilidade / Aceleradores</b><p style="margin-top:6px;color:#334155">${c.visibilidade||'—'}</p></div>
+          <div><b style="color:#0b4e7d;font-size:10px;text-transform:uppercase;letter-spacing:1px">Observações</b><p style="margin-top:6px;color:#334155">${c.observacoes||'—'}</p></div>
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  document.getElementById('planoWrap').innerHTML = `
+    <div style="overflow-x:auto">
+    <table class="table">
+      <thead><tr>
+        <th>Área</th><th>Trilha</th><th style="text-align:center">De Nível</th><th></th><th style="text-align:center">Para Nível</th>
+        <th style="text-align:center">Avaliação%</th><th style="text-align:center">E-SAT</th><th style="text-align:center">PDI%</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>`;
+}
+
+function togglePlanoCriterioDetalhe(id) {
+  const det = document.getElementById('plano-crit-detalhe-' + id);
+  if (!det) return;
+  const isOpen = det.style.display !== 'none';
+  document.querySelectorAll('[id^="plano-crit-detalhe-"]').forEach(r => r.style.display = 'none');
+  if (!isOpen) det.style.display = '';
+}
+
+// ── Faixas Salariais ──────────────────────────────────────
+function renderPlanoFaixas() {
+  if (!allPlanoFaixas.length) {
+    document.getElementById('planoWrap').innerHTML = '<div class="empty-state">Nenhuma faixa salarial cadastrada. Importe os dados na aba <b>Importar Dados</b>.</div>';
+    return;
+  }
+  const sorted = [...allPlanoFaixas].sort((a,b) => (a.trilha||'').localeCompare(b.trilha||'') || (a.nivel||0)-(b.nivel||0));
+  let rows = '';
+  sorted.forEach(f => {
+    const min = f.minimo ? 'R$ '+Number(f.minimo).toLocaleString('pt-BR') : '—';
+    const med = f.medio  ? 'R$ '+Number(f.medio).toLocaleString('pt-BR')  : '—';
+    const max = f.maximo ? 'R$ '+Number(f.maximo).toLocaleString('pt-BR') : '—';
+    rows += `<tr>
+      <td><span class="badge badge-blue">${f.nivel||'—'}</span></td>
+      <td><b>${f.cargo||'—'}</b></td>
+      <td>${f.area||'—'}</td>
+      <td><span class="badge badge-orange">${f.trilha||'—'}</span></td>
+      <td>${f.tipo_contrato||'—'}</td>
+      <td style="text-align:right">${min}</td>
+      <td style="text-align:right">${med}</td>
+      <td style="text-align:right">${max}</td>
+      <td style="text-align:center">${f.variavel==='sim'||f.variavel===true?'<span class="badge badge-green">Sim</span>':'<span class="badge badge-red">Não</span>'}</td>
+    </tr>`;
+  });
+
+  document.getElementById('planoWrap').innerHTML = `
+    <div style="overflow-x:auto">
+    <table class="table">
+      <thead><tr>
+        <th>Nível</th><th>Cargo</th><th>Área</th><th>Trilha</th><th>Contrato</th>
+        <th style="text-align:right">Mínimo</th><th style="text-align:right">Médio</th><th style="text-align:right">Máximo</th><th style="text-align:center">Variável?</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>`;
+}
+
+// ── Radar de Talentos ──────────────────────────────────────
+function renderPlanoRadar() {
+  document.getElementById('planoTabActions').innerHTML =
+    `<button class="btn btn-primary btn-sm" onclick="openRadarModal(null)">+ Adicionar</button>`;
+
+  if (!allColabs.length) {
+    document.getElementById('planoWrap').innerHTML = '<div class="empty-state">Nenhum colaborador encontrado.</div>';
+    return;
+  }
+
+  const radarMap = {};
+  allPlanoRadar.forEach(r => radarMap[r.colaborador_id] = r);
+
+  const prontoLabel = { sim:'<span class="badge badge-green">Sim</span>', desenvolvimento:'<span class="badge badge-blue">Em dev.</span>', nao:'<span class="badge badge-red">Não</span>' };
+
+  let rows = '';
+  allColabs.forEach(c => {
+    const r = radarMap[c.id] || {};
+    rows += `<tr>
+      <td><b>${c.nome||'—'}</b></td>
+      <td>${r.area||c.area||'—'}</td>
+      <td>${r.cargo||c.cargo||'—'}</td>
+      <td style="text-align:center">${r.nivel!=null?`<span class="badge badge-blue">${r.nivel}</span>`:'—'}</td>
+      <td><span class="badge badge-orange">${r.trilha||'—'}</span></td>
+      <td style="text-align:center">${r.performance!=null?r.performance+'%':'—'}</td>
+      <td style="text-align:center">${r.esat!=null?r.esat+'%':'—'}</td>
+      <td style="text-align:center">${r.pdi!=null?r.pdi+'%':'—'}</td>
+      <td style="text-align:center">${prontoLabel[r.pronto]||'—'}</td>
+      <td style="text-align:center"><button class="btn btn-outline btn-sm" onclick="openRadarModal('${c.id}')">✏️</button></td>
+    </tr>`;
+  });
+
+  document.getElementById('planoWrap').innerHTML = `
+    <div style="overflow-x:auto">
+    <table class="table">
+      <thead><tr>
+        <th>Colaborador</th><th>Área</th><th>Cargo</th><th style="text-align:center">Nível</th><th>Trilha</th>
+        <th style="text-align:center">Performance</th><th style="text-align:center">E-SAT</th><th style="text-align:center">PDI%</th>
+        <th style="text-align:center">Pronto?</th><th></th>
+      </tr></thead>
+      <tbody>${rows||'<tr><td colspan="10" class="empty-state">Nenhum colaborador.</td></tr>'}</tbody>
+    </table>
+    </div>`;
+}
+
+function openRadarModal(colabId) {
+  _radarEditId = colabId;
+  const modal = document.getElementById('radarModal');
+
+  // clear fields
+  ['radarNome','radarArea','radarCargo','radarAceleradores','radarMeta','radarPotencial','radarAcao','radarRiscos','radarObs'].forEach(id => document.getElementById(id).value = '');
+  ['radarTrilha','radarNivel','radarPronto'].forEach(id => document.getElementById(id).value = '');
+  ['radarPerformance','radarEsat','radarPdi'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('radarUltimaPromocao').value = '';
+  document.getElementById('radarColabId').value = colabId || '';
+
+  if (colabId) {
+    const colab = allColabs.find(c => c.id === colabId) || {};
+    document.getElementById('radarNome').value = colab.nome || '';
+    document.getElementById('radarArea').value = colab.area || '';
+    document.getElementById('radarModalTitle').textContent = 'Painel de Progresso — ' + (colab.nome || '');
+
+    const existente = allPlanoRadar.find(r => r.colaborador_id === colabId);
+    if (existente) {
+      document.getElementById('radarTrilha').value = existente.trilha || '';
+      populateRadarNiveis();
+      document.getElementById('radarNivel').value = existente.nivel != null ? existente.nivel : '';
+      document.getElementById('radarCargo').value = existente.cargo || '';
+      document.getElementById('radarUltimaPromocao').value = existente.ultima_promocao || '';
+      document.getElementById('radarPerformance').value = existente.performance != null ? existente.performance : '';
+      document.getElementById('radarEsat').value = existente.esat != null ? existente.esat : '';
+      document.getElementById('radarPdi').value = existente.pdi != null ? existente.pdi : '';
+      document.getElementById('radarPronto').value = existente.pronto || '';
+      document.getElementById('radarAceleradores').value = existente.aceleradores || '';
+      document.getElementById('radarMeta').value = existente.meta || '';
+      document.getElementById('radarPotencial').value = existente.potencial || '';
+      document.getElementById('radarAcao').value = existente.acao || '';
+      document.getElementById('radarRiscos').value = existente.riscos || '';
+      document.getElementById('radarObs').value = existente.obs || '';
+    }
+  } else {
+    document.getElementById('radarModalTitle').textContent = 'Adicionar ao Radar';
+    // No-colab scenario (add by name) — show name as editable
+    document.getElementById('radarNome').removeAttribute('readonly');
+    document.getElementById('radarArea').removeAttribute('readonly');
+  }
+
+  modal.classList.add('open');
+}
+
+function closeRadarModal() {
+  document.getElementById('radarModal').classList.remove('open');
+  // restore readonly
+  document.getElementById('radarNome').setAttribute('readonly', true);
+  document.getElementById('radarArea').setAttribute('readonly', true);
+}
+
+function populateRadarNiveis() {
+  const trilha = document.getElementById('radarTrilha').value;
+  const nivelSelect = document.getElementById('radarNivel');
+  const niveis = allPlanoNiveis.filter(n => !trilha || n.trilha === trilha);
+  const unique = [...new Set(niveis.map(n => n.nivel).filter(v => v!=null))].sort((a,b)=>a-b);
+  nivelSelect.innerHTML = '<option value="">Selecione</option>' + unique.map(n => `<option value="${n}">${n}</option>`).join('');
+}
+
+async function saveRadarModal() {
+  const colabId = document.getElementById('radarColabId').value || _radarEditId;
+  const colab = allColabs.find(c => c.id === colabId) || {};
+  const data = {
+    colaborador_id:    colabId || null,
+    nome:              document.getElementById('radarNome').value.trim() || colab.nome || '',
+    area:              document.getElementById('radarArea').value.trim() || colab.area || '',
+    trilha:            document.getElementById('radarTrilha').value,
+    nivel:             document.getElementById('radarNivel').value !== '' ? Number(document.getElementById('radarNivel').value) : null,
+    cargo:             document.getElementById('radarCargo').value.trim(),
+    ultima_promocao:   document.getElementById('radarUltimaPromocao').value,
+    performance:       document.getElementById('radarPerformance').value !== '' ? Number(document.getElementById('radarPerformance').value) : null,
+    esat:              document.getElementById('radarEsat').value !== '' ? Number(document.getElementById('radarEsat').value) : null,
+    pdi:               document.getElementById('radarPdi').value !== '' ? Number(document.getElementById('radarPdi').value) : null,
+    pronto:            document.getElementById('radarPronto').value,
+    aceleradores:      document.getElementById('radarAceleradores').value.trim(),
+    meta:              document.getElementById('radarMeta').value.trim(),
+    potencial:         document.getElementById('radarPotencial').value.trim(),
+    acao:              document.getElementById('radarAcao').value.trim(),
+    riscos:            document.getElementById('radarRiscos').value.trim(),
+    obs:               document.getElementById('radarObs').value.trim(),
+    atualizado_em:     new Date().toISOString()
+  };
+  try {
+    const existente = colabId ? allPlanoRadar.find(r => r.colaborador_id === colabId) : null;
+    if (existente) {
+      await db.collection('progresso_colaborador').doc(existente.id).set(data, {merge:true});
+    } else {
+      await db.collection('progresso_colaborador').add(data);
+    }
+    toast('Progresso salvo!');
+    closeRadarModal();
+    await loadPlano();
+    setPlanoTab('radar');
+  } catch(e) { toast('Erro: '+e.message,'e'); }
+}
+
+// ── Importar Dados ─────────────────────────────────────────
+function renderPlanoImportar() {
+  document.getElementById('planoWrap').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:8px">
+
+      <div class="card" style="margin:0;border:2px dashed #bfdbfe">
+        <div class="card-header" style="margin-bottom:12px"><span class="card-title">Caminhos de Crescimento</span></div>
+        <p style="font-size:12px;color:#64748b;margin-bottom:14px">Importa trilha, nível, cargo, área, escopo, competências e autonomia de cada nível.</p>
+        <p style="font-size:11px;color:#94a3b8;margin-bottom:10px">Colunas esperadas: <b>Trilha, Nível, Cargo, Área, Escopo/Responsabilidades, Competências Técnicas, Competências Comportamentais, Tipo de Autonomia, Próximos Movimentos Possíveis</b></p>
+        <input type="file" accept=".csv,.xlsx,.xls" id="inputNiveis" style="display:none" onchange="previewImport('niveis',this)">
+        <button class="btn btn-outline" style="width:100%" onclick="document.getElementById('inputNiveis').click()">Selecionar arquivo CSV</button>
+        <div id="previewNiveis" style="margin-top:10px;font-size:12px;color:#334155"></div>
+        <button class="btn btn-primary" id="btnImportNiveis" style="width:100%;margin-top:10px;display:none" onclick="confirmarImport('niveis')">Importar Níveis</button>
+      </div>
+
+      <div class="card" style="margin:0;border:2px dashed #bfdbfe">
+        <div class="card-header" style="margin-bottom:12px"><span class="card-title">Critérios de Promoção</span></div>
+        <p style="font-size:12px;color:#64748b;margin-bottom:14px">Importa os requisitos (Avaliação%, E-SAT, PDI%) para cada transição de nível.</p>
+        <p style="font-size:11px;color:#94a3b8;margin-bottom:10px">Colunas esperadas: <b>Área, Trilha, De Nível, Para Nível, Entregas Necessárias, Comportamentos Esperados, Visibilidade/Aceleradores, Avaliação(%), E-SAT, PDI(%), Observações</b></p>
+        <input type="file" accept=".csv,.xlsx,.xls" id="inputCriterios" style="display:none" onchange="previewImport('criterios',this)">
+        <button class="btn btn-outline" style="width:100%" onclick="document.getElementById('inputCriterios').click()">Selecionar arquivo CSV</button>
+        <div id="previewCriterios" style="margin-top:10px;font-size:12px;color:#334155"></div>
+        <button class="btn btn-primary" id="btnImportCriterios" style="width:100%;margin-top:10px;display:none" onclick="confirmarImport('criterios')">Importar Critérios</button>
+      </div>
+
+      <div class="card" style="margin:0;border:2px dashed #bfdbfe">
+        <div class="card-header" style="margin-bottom:12px"><span class="card-title">Faixas Salariais</span></div>
+        <p style="font-size:12px;color:#64748b;margin-bottom:14px">Importa mínimo, médio e máximo salarial por nível e área.</p>
+        <p style="font-size:11px;color:#94a3b8;margin-bottom:10px">Colunas esperadas: <b>Trilha, Nível, Cargo, Área, Tipo de Contrato, Mínimo, Médio, Máximo, Variável?</b></p>
+        <input type="file" accept=".csv,.xlsx,.xls" id="inputFaixas" style="display:none" onchange="previewImport('faixas',this)">
+        <button class="btn btn-outline" style="width:100%" onclick="document.getElementById('inputFaixas').click()">Selecionar arquivo CSV</button>
+        <div id="previewFaixas" style="margin-top:10px;font-size:12px;color:#334155"></div>
+        <button class="btn btn-primary" id="btnImportFaixas" style="width:100%;margin-top:10px;display:none" onclick="confirmarImport('faixas')">Importar Faixas</button>
+      </div>
+
+    </div>
+    <p style="font-size:11px;color:#94a3b8;margin-top:8px">⚠️ A importação <b>substitui todos os dados existentes</b> da coleção correspondente.</p>
+  `;
+}
+
+let _importCache = { niveis: null, criterios: null, faixas: null };
+
+function _normKey(s) {
+  return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+}
+
+function _col(row, ...names) {
+  for (const name of names) {
+    const k = _normKey(name);
+    const found = Object.keys(row).find(r => _normKey(r) === k);
+    if (found !== undefined && row[found] !== '' && row[found] != null) return row[found];
+  }
+  return '';
+}
+
+function _parseCSV(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array', raw:false});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+        resolve(rows);
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function previewImport(tipo, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const previewEl = document.getElementById('preview' + tipo.charAt(0).toUpperCase() + tipo.slice(1));
+  const btnEl = document.getElementById('btnImport' + tipo.charAt(0).toUpperCase() + tipo.slice(1));
+  try {
+    const rows = await _parseCSV(file);
+    const valid = rows.filter(r => Object.values(r).some(v => v !== ''));
+    _importCache[tipo] = valid;
+    previewEl.innerHTML = `<span style="color:#15803d">✓ ${valid.length} registros encontrados</span>`;
+    btnEl.style.display = '';
+  } catch(e) {
+    previewEl.innerHTML = `<span style="color:#dc2626">Erro ao ler arquivo: ${e.message}</span>`;
+    btnEl.style.display = 'none';
+  }
+}
+
+async function confirmarImport(tipo) {
+  const rows = _importCache[tipo];
+  if (!rows || !rows.length) return;
+  if (!confirm(`Isso vai substituir TODOS os dados de "${tipo}" no Firestore (${rows.length} registros). Continuar?`)) return;
+
+  const colMap = {
+    niveis: row => ({
+      trilha:               String(_col(row,'Trilha')),
+      nivel:                Number(_col(row,'Nível','Nivel')) || 0,
+      cargo:                String(_col(row,'Cargo')),
+      area:                 String(_col(row,'Área','Area')),
+      escopo:               String(_col(row,'Escopo/Responsabilidades','Escopo')),
+      comp_tecnicas:        String(_col(row,'Competências Técnicas','Competencias Tecnicas')),
+      comp_comportamentais: String(_col(row,'Competências Comportamentais','Competencias Comportamentais')),
+      autonomia:            String(_col(row,'Tipo de Autonomia','Autonomia')),
+      proximos_movimentos:  String(_col(row,'Próximos Movimentos Possíveis','Proximos Movimentos'))
+    }),
+    criterios: row => ({
+      area:          String(_col(row,'Área','Area')),
+      trilha:        String(_col(row,'Trilha')),
+      de_nivel:      Number(_col(row,'De Nível','De Nivel')) || 0,
+      para_nivel:    Number(_col(row,'Para Nível','Para Nivel')) || 0,
+      entregas:      String(_col(row,'Entregas Necessárias','Entregas')),
+      comportamentos:String(_col(row,'Comportamentos Esperados','Comportamentos')),
+      visibilidade:  String(_col(row,'Visibilidade/Aceleradores','Visibilidade')),
+      avaliacao_pct: Number(_col(row,'Avaliação(%)','Avaliacao(%)','Avaliacao')) || null,
+      esat:          Number(_col(row,'E-SAT','ESAT')) || null,
+      pdi_pct:       Number(_col(row,'PDI(%)','PDI')) || null,
+      observacoes:   String(_col(row,'Observações','Observacoes'))
+    }),
+    faixas: row => {
+      const varVal = String(_col(row,'Variável?','Variavel?','Variavel')).toLowerCase();
+      return {
+        trilha:         String(_col(row,'Trilha')),
+        nivel:          Number(_col(row,'Nível','Nivel')) || 0,
+        cargo:          String(_col(row,'Cargo')),
+        area:           String(_col(row,'Área','Area')),
+        tipo_contrato:  String(_col(row,'Tipo de Contrato','Contrato')),
+        escopo:         String(_col(row,'Escopo')),
+        comp_tecnicas:  String(_col(row,'Competências Técnicas','Competencias Tecnicas')),
+        comp_comportamentais: String(_col(row,'Comp. Comportamentais','Competencias Comportamentais')),
+        minimo:         Number(String(_col(row,'Mínimo','Minimo')).replace(/[^0-9.,]/g,'').replace(',','.')) || null,
+        medio:          Number(String(_col(row,'Médio','Medio')).replace(/[^0-9.,]/g,'').replace(',','.')) || null,
+        maximo:         Number(String(_col(row,'Máximo','Maximo')).replace(/[^0-9.,]/g,'').replace(',','.')) || null,
+        variavel:       varVal === 'sim' || varVal === 'yes' || varVal === 'true'
+      };
+    }
+  };
+
+  const colecao = { niveis:'plano_niveis', criterios:'plano_criterios', faixas:'plano_faixas' }[tipo];
+  const mapper  = colMap[tipo];
+  const btnEl   = document.getElementById('btnImport' + tipo.charAt(0).toUpperCase() + tipo.slice(1));
+  btnEl.textContent = 'Importando…';
+  btnEl.disabled = true;
+
+  try {
+    // Delete all existing
+    const existing = await db.collection(colecao).get();
+    const CHUNK = 490;
+    for (let i = 0; i < existing.docs.length; i += CHUNK) {
+      const batch = db.batch();
+      existing.docs.slice(i, i+CHUNK).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    // Insert new
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const batch = db.batch();
+      rows.slice(i, i+CHUNK).forEach(row => {
+        const ref = db.collection(colecao).doc();
+        batch.set(ref, mapper(row));
+      });
+      await batch.commit();
+    }
+    toast(`${rows.length} registros importados com sucesso!`);
+    await loadPlano();
+    setPlanoTab('importar');
+  } catch(e) {
+    toast('Erro na importação: '+e.message, 'e');
+    btnEl.textContent = 'Importar';
+    btnEl.disabled = false;
+  }
 }
 </script>
 </body>
