@@ -5344,7 +5344,7 @@ function buildPlanoKpis() {
     <div class="kpi-card"><div class="kpi-lbl">Níveis Cadastrados</div><div class="kpi-val">${allPlanoNiveis.length}</div><div class="kpi-sub">${trilhas.length} trilhas · ${areas.length} áreas</div></div>
     <div class="kpi-card"><div class="kpi-lbl">Critérios de Promoção</div><div class="kpi-val">${allPlanoCriterios.length}</div><div class="kpi-sub">transições mapeadas</div></div>
     <div class="kpi-card"><div class="kpi-lbl">Faixas Salariais</div><div class="kpi-val">${allPlanoFaixas.length}</div><div class="kpi-sub">registros</div></div>
-    <div class="kpi-card"><div class="kpi-lbl">Radar de Talentos</div><div class="kpi-val">${allPlanoRadar.length}</div><div class="kpi-sub">colaboradores mapeados</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">Radar de Talentos</div><div class="kpi-val">${allPlanoRadar.length}</div><div class="kpi-sub">de ${allColabs.filter(c => /^ativ/i.test(c.status||'ativo') && !/médic|medic/i.test(c.cargo||'')).length} colaboradores ativos</div></div>
   `;
 }
 
@@ -5384,7 +5384,7 @@ function renderPlanoMapa() {
   filtered.forEach(n => {
     const escopo = (n.escopo||'').length > 80 ? (n.escopo||'').slice(0,80)+'…' : (n.escopo||'—');
     rows += `<tr style="cursor:pointer" onclick="togglePlanoNivelDetalhe('${n.id}', this)">
-      <td><span class="badge badge-blue">${n.nivel||'—'}</span></td>
+      <td><span class="badge badge-blue">${n.nivel != null ? n.nivel : '—'}</span></td>
       <td><b>${n.cargo||'—'}</b></td>
       <td>${n.area||'—'}</td>
       <td><span class="badge badge-orange">${n.trilha||'—'}</span></td>
@@ -5433,18 +5433,18 @@ function renderPlanoCriterios() {
     document.getElementById('planoWrap').innerHTML = '<div class="empty-state">Nenhum critério cadastrado. Importe os dados na aba <b>Importar Dados</b>.</div>';
     return;
   }
-  const sorted = [...allPlanoCriterios].sort((a,b) => (a.area||'').localeCompare(b.area||'') || (a.de_nivel||0)-(b.de_nivel||0));
+  const sorted = [...allPlanoCriterios].sort((a,b) => (a.area||'').localeCompare(b.area||'') || (a.de_nivel||'').localeCompare(b.de_nivel||''));
   let rows = '';
   sorted.forEach(c => {
     rows += `<tr style="cursor:pointer" onclick="togglePlanoCriterioDetalhe('${c.id}', this)">
       <td>${c.area||'—'}</td>
       <td><span class="badge badge-orange">${c.trilha||'—'}</span></td>
-      <td style="text-align:center"><span class="badge badge-blue">${c.de_nivel||'—'}</span></td>
-      <td style="text-align:center">→</td>
-      <td style="text-align:center"><span class="badge badge-green">${c.para_nivel||'—'}</span></td>
-      <td style="text-align:center">${c.avaliacao_pct!=null?c.avaliacao_pct+'%':'—'}</td>
-      <td style="text-align:center">${c.esat!=null?c.esat+'%':'—'}</td>
-      <td style="text-align:center">${c.pdi_pct!=null?c.pdi_pct+'%':'—'}</td>
+      <td><span class="badge badge-blue">${c.de_nivel||'—'}</span></td>
+      <td style="text-align:center;color:#94a3b8">→</td>
+      <td><span class="badge badge-green">${c.para_nivel||'—'}</span></td>
+      <td style="text-align:center;font-size:12px">${c.avaliacao_pct||'—'}</td>
+      <td style="text-align:center;font-size:12px">${c.esat||'—'}</td>
+      <td style="text-align:center;font-size:12px">${c.pdi_pct||'—'}</td>
     </tr>
     <tr id="plano-crit-detalhe-${c.id}" style="display:none">
       <td colspan="8" style="background:#f8fafc;padding:16px 20px">
@@ -5491,7 +5491,7 @@ function renderPlanoFaixas() {
     const med = f.medio  ? 'R$ '+Number(f.medio).toLocaleString('pt-BR')  : '—';
     const max = f.maximo ? 'R$ '+Number(f.maximo).toLocaleString('pt-BR') : '—';
     rows += `<tr>
-      <td><span class="badge badge-blue">${f.nivel||'—'}</span></td>
+      <td><span class="badge badge-blue">${f.nivel != null ? f.nivel : '—'}</span></td>
       <td><b>${f.cargo||'—'}</b></td>
       <td>${f.area||'—'}</td>
       <td><span class="badge badge-orange">${f.trilha||'—'}</span></td>
@@ -5556,8 +5556,8 @@ function renderPlanoRadar() {
   document.getElementById('planoTabActions').innerHTML =
     `<button class="btn btn-primary btn-sm" onclick="openRadarModal(null)">+ Adicionar</button>`;
 
-  if (!allColabs.length) {
-    document.getElementById('planoWrap').innerHTML = '<div class="empty-state">Nenhum colaborador encontrado.</div>';
+  if (!colabsRadar.length) {
+    document.getElementById('planoWrap').innerHTML = '<div class="empty-state">Nenhum colaborador ativo encontrado.</div>';
     return;
   }
 
@@ -5566,8 +5566,14 @@ function renderPlanoRadar() {
 
   const prontoLabel = { sim:'<span class="badge badge-green">Sim</span>', desenvolvimento:'<span class="badge badge-blue">Em dev.</span>', nao:'<span class="badge badge-red">Não</span>' };
 
+  const colabsRadar = allColabs.filter(c => {
+    if (!/^ativ/i.test(c.status || 'ativo')) return false;
+    if (/médic|medic/i.test(c.cargo || '')) return false;
+    return true;
+  });
+
   let rows = '';
-  allColabs.forEach(c => {
+  colabsRadar.forEach(c => {
     const r = radarMap[c.id] || {};
     rows += `<tr>
       <td><b>${c.nome||'—'}</b></td>
@@ -5735,14 +5741,24 @@ function renderPlanoImportar() {
 
 let _importCache = { niveis: null, criterios: null, faixas: null };
 
+function _numOrNull(v) {
+  const n = Number(v);
+  return (v !== '' && v != null && !isNaN(n)) ? n : null;
+}
+
 function _normKey(s) {
-  return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+  return (s||'').toString().replace(/^\uFEFF/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
 }
 
 function _col(row, ...names) {
+  const keys = Object.keys(row);
   for (const name of names) {
     const k = _normKey(name);
-    const found = Object.keys(row).find(r => _normKey(r) === k);
+    // Exact match
+    let found = keys.find(r => _normKey(r) === k);
+    if (found !== undefined && row[found] !== '' && row[found] != null) return row[found];
+    // Contains match (handles extra words like "Principais", spaces around "/", etc.)
+    found = keys.find(r => { const rk = _normKey(r); return rk.includes(k) || k.includes(rk); });
     if (found !== undefined && row[found] !== '' && row[found] != null) return row[found];
   }
   return '';
@@ -5789,42 +5805,42 @@ async function confirmarImport(tipo) {
   const colMap = {
     niveis: row => ({
       trilha:               String(_col(row,'Trilha')),
-      nivel:                Number(_col(row,'Nível','Nivel')) || 0,
+      nivel:                _numOrNull(_col(row,'Nível','Nivel')),
       cargo:                String(_col(row,'Cargo')),
       area:                 String(_col(row,'Área','Area')),
-      escopo:               String(_col(row,'Escopo/Responsabilidades','Escopo')),
+      escopo:               String(_col(row,'Escopo / Responsabilidades Principais','Escopo/Responsabilidades Principais','Escopo/Responsabilidades','Escopo Responsabilidades','Escopo')),
       comp_tecnicas:        String(_col(row,'Competências Técnicas','Competencias Tecnicas')),
       comp_comportamentais: String(_col(row,'Competências Comportamentais','Competencias Comportamentais')),
       autonomia:            String(_col(row,'Tipo de Autonomia','Autonomia')),
-      proximos_movimentos:  String(_col(row,'Próximos Movimentos Possíveis','Proximos Movimentos'))
+      proximos_movimentos:  String(_col(row,'Próximo(s) Movimento(s) Possíveis','Próximos Movimentos Possíveis','Proximos Movimentos Possiveis','Proximos Movimentos'))
     }),
     criterios: row => ({
       area:          String(_col(row,'Área','Area')),
       trilha:        String(_col(row,'Trilha')),
-      de_nivel:      Number(_col(row,'De Nível','De Nivel')) || 0,
-      para_nivel:    Number(_col(row,'Para Nível','Para Nivel')) || 0,
+      de_nivel:      String(_col(row,'De Nível','De Nivel')),
+      para_nivel:    String(_col(row,'Para Nível','Para Nivel')),
       entregas:      String(_col(row,'Entregas Necessárias','Entregas')),
       comportamentos:String(_col(row,'Comportamentos Esperados','Comportamentos')),
       visibilidade:  String(_col(row,'Visibilidade/Aceleradores','Visibilidade')),
-      avaliacao_pct: Number(_col(row,'Avaliação(%)','Avaliacao(%)','Avaliacao')) || null,
-      esat:          Number(_col(row,'E-SAT','ESAT')) || null,
-      pdi_pct:       Number(_col(row,'PDI(%)','PDI')) || null,
+      avaliacao_pct: String(_col(row,'Avaliação (%)','Avaliação(%)','Avaliacao (%)','Avaliacao(%)','Avaliacao')),
+      esat:          String(_col(row,'E-SAT','ESAT')),
+      pdi_pct:       String(_col(row,'PDI (%)','PDI(%)','PDI')),
       observacoes:   String(_col(row,'Observações','Observacoes'))
     }),
     faixas: row => {
       const varVal = String(_col(row,'Variável?','Variavel?','Variavel')).toLowerCase();
       return {
         trilha:         String(_col(row,'Trilha')),
-        nivel:          Number(_col(row,'Nível','Nivel')) || 0,
+        nivel:          _numOrNull(_col(row,'Nível','Nivel')),
         cargo:          String(_col(row,'Cargo')),
         area:           String(_col(row,'Área','Area')),
         tipo_contrato:  String(_col(row,'Tipo de Contrato','Contrato')),
         escopo:         String(_col(row,'Escopo')),
         comp_tecnicas:  String(_col(row,'Competências Técnicas','Competencias Tecnicas')),
         comp_comportamentais: String(_col(row,'Comp. Comportamentais','Competencias Comportamentais')),
-        minimo:         Number(String(_col(row,'Mínimo','Minimo')).replace(/[^0-9.,]/g,'').replace(',','.')) || null,
-        medio:          Number(String(_col(row,'Médio','Medio')).replace(/[^0-9.,]/g,'').replace(',','.')) || null,
-        maximo:         Number(String(_col(row,'Máximo','Maximo')).replace(/[^0-9.,]/g,'').replace(',','.')) || null,
+        minimo:         _numOrNull(String(_col(row,'Mínimo','Minimo')).replace(/[^0-9.,]/g,'').replace(',','.')),
+        medio:          _numOrNull(String(_col(row,'Médio','Medio')).replace(/[^0-9.,]/g,'').replace(',','.')),
+        maximo:         _numOrNull(String(_col(row,'Máximo','Maximo')).replace(/[^0-9.,]/g,'').replace(',','.')),
         variavel:       varVal === 'sim' || varVal === 'yes' || varVal === 'true'
       };
     }
