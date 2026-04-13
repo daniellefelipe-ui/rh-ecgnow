@@ -181,6 +181,7 @@
     </div>
     <button class="login-btn" onclick="login()">Entrar</button>
     <p class="login-error" id="loginError"></p>
+    <p style="text-align:center;margin-top:10px"><a href="#" onclick="resetSenha()" style="font-size:12px;color:#64748b">Esqueci minha senha</a></p>
   </div>
 </div>
 
@@ -368,7 +369,7 @@
     <section class="page-section" id="sec-recrutamento">
       <div class="page-header">
         <h1>Recrutamento e Seleção</h1>
-        <a href="https://heartfelt-buttercream-6453b9.netlify.app" target="_blank" class="btn btn-primary">🎯 Abrir Painel R&S</a>
+        <a href="https://daniellefelipe-ui.github.io/painel-rs-ecgnow/" target="_blank" class="btn btn-primary">🎯 Abrir Painel R&S</a>
       </div>
       <div class="kpi-grid" id="recKpis">
         <div class="kpi-card"><div class="kpi-lbl">Aguardando dados</div><div class="kpi-val">—</div></div>
@@ -383,6 +384,20 @@
           <canvas id="chartRecFunil" height="160"></canvas>
         </div>
       </div>
+      <!-- ── Correção de Teste ECG ───────────────────────── -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px">
+          <span class="card-title">🫀 Correção de Teste ECG</span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="document.getElementById('ecgExcelInput').click()" id="ecgBtnUpload">📥 Importar Respostas</button>
+            <input type="file" id="ecgExcelInput" accept=".xlsx,.xls" style="display:none" onchange="ecgImportarExcel(this)">
+            <button class="btn btn-outline" onclick="ecgExportarExcel()" id="ecgBtnExportar" style="display:none">📤 Exportar Resultado</button>
+          </div>
+        </div>
+        <div id="ecgStatus" style="padding:12px 16px;font-size:13px;color:#64748b"></div>
+        <div id="ecgResultWrap"></div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <span class="card-title">Processos Seletivos</span>
@@ -1634,6 +1649,18 @@ async function login() {
 }
 
 async function logout() { await auth.signOut(); }
+
+async function resetSenha() {
+  const email = document.getElementById('loginEmail').value.trim() || 'danielle.felipe@ecgnow.com.br';
+  try {
+    await auth.sendPasswordResetEmail(email);
+    document.getElementById('loginError').style.color = '#16a34a';
+    document.getElementById('loginError').textContent = '✅ E-mail de reset enviado para ' + email;
+  } catch(e) {
+    document.getElementById('loginError').style.color = '#dc2626';
+    document.getElementById('loginError').textContent = 'Erro: ' + e.message;
+  }
+}
 
 // ── Navigation ────────────────────────────────────────────
 function showSection(name, btn) {
@@ -6508,6 +6535,258 @@ async function confirmarImport(tipo) {
     btnEl.disabled = false;
   }
 }
+
+// ── Correção de Teste ECG ─────────────────────────────────
+
+const ECG_GABARITO = {
+  1:  ['ritmo sinusal','bloqueio de ramo direito','sobrecarga atrial esquerda'],
+  2:  ['ritmo atrial multifocal'],
+  3:  ['ritmo sinusal','bloqueio atrioventricular de segundo grau mobitz i','bloqueio de ramo direito'],
+  4:  ['ritmo sinusal','area eletrica inativa inferior','alteracao de repolarizacao inferolateral'],
+  5:  ['ritmo sinusal','supradesnivelamento de segmento st parede inferolateral','imagem em espelho'],
+  6:  ['troca de eletrodos'],
+  7:  ['bloqueio atrioventricular 2:1','bloqueio de ramo esquerdo'],
+  8:  ['bloqueio atrioventricular total','bloqueio de ramo direito','bloqueio divisional anterossuperior esquerdo'],
+  9:  ['taquicardia supraventricular'],
+  10: ['ritmo juncional bradicardico'],
+  11: ['taquicardia sinusal','sobrecarga ventricular esquerda'],
+  12: ['ritmo sinusal','disturbio de conducao pelo ramo direito','bloqueio divisional anterossuperior esquerdo'],
+  13: ['marcapasso modo aai','bloqueio de ramo esquerdo'],
+  14: ['fibrilacao atrial','marcapasso ventricular vvi'],
+  15: ['marcapasso modo vvi'],
+  16: ['ritmo sinusal para os atrios','marcapasso ventricular vvi'],
+  17: ['fibrilacao atrial','sobrecarga ventricular esquerda'],
+  18: ['ritmo sinusal','area eletrica inativa anterior','area eletrica inativa inferior','sobrecarga ventricular esquerda'],
+  19: ['ritmo sinusal','dentro dos limites da normalidade'],
+  20: ['marcapasso modo aai','sobrecarga ventricular esquerda'],
+  21: ['velocidade incorreta 50mm/s'],
+  22: ['bloqueio atrioventricular total'],
+  23: ['ritmo sinusal','pre-excitacao ventricular intermitente'],
+  24: ['taquicardia ventricular'],
+  25: ['flutter atrial','intervalo qtc prolongado'],
+  26: ['taquicardia supraventricular por reentrada nodal'],
+  27: ['ritmo sinusal','dentro da normalidade para a idade'],
+  28: ['ritmo sinusal','sobrecarga biatrial'],
+  29: ['ritmo sinusal','extrassistole ventricular'],
+  30: ['mobitz i tem alargamento progressivo do pr','mobitz ii tem bloqueio subito com pr fixo'],
+};
+
+let ecgRespostas = [];
+let ecgResultados = [];
+
+function ecgImportarExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const abaNome = wb.SheetNames.find(n => n.toLowerCase().includes('resposta') || n.toLowerCase().includes('formul')) || wb.SheetNames[0];
+      const ws = wb.Sheets[abaNome];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (rows.length < 2) { toast('Planilha sem dados', 'e'); return; }
+      ecgRespostas = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const nome = (row[2] || '').toString().trim();
+        if (!nome) continue;
+        const obj = { nome };
+        for (let q = 1; q <= 30; q++) obj['q' + q] = (row[2 + q] || '').toString().trim();
+        ecgRespostas.push(obj);
+      }
+      ecgResultados = [];
+      document.getElementById('ecgBtnExportar').style.display = 'none';
+      document.getElementById('ecgStatus').textContent = '';
+      ecgRenderSelecao();
+      toast(`${ecgRespostas.length} candidatos carregados`);
+    } catch(err) { toast('Erro ao ler Excel: ' + err.message, 'e'); }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = '';
+}
+
+function ecgRenderSelecao() {
+  const wrap = document.getElementById('ecgResultWrap');
+  const itens = ecgRespostas.map((c, i) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
+      <input type="checkbox" id="ecgChk_${i}" checked style="width:15px;height:15px;cursor:pointer">
+      <span style="font-size:13px;color:#334155">${c.nome}</span>
+    </label>`).join('');
+  wrap.innerHTML = `
+    <div style="padding:12px 16px 4px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f1f5f9">
+      <span style="font-size:13px;font-weight:600;color:#334155">${ecgRespostas.length} candidatos encontrados</span>
+      <button class="btn btn-outline" style="padding:4px 10px;font-size:12px" onclick="ecgSelecionarTodos(true)">Selecionar todos</button>
+      <button class="btn btn-outline" style="padding:4px 10px;font-size:12px" onclick="ecgSelecionarTodos(false)">Limpar seleção</button>
+    </div>
+    <div style="padding:8px 16px;max-height:260px;overflow-y:auto">${itens}</div>
+    <div style="padding:12px 16px;border-top:1px solid #f1f5f9">
+      <button class="btn btn-primary" onclick="ecgCorrigirSelecionados()">▶ Corrigir selecionados</button>
+    </div>`;
+}
+
+function ecgSelecionarTodos(val) {
+  ecgRespostas.forEach((_, i) => { const c = document.getElementById('ecgChk_' + i); if (c) c.checked = val; });
+}
+
+async function ecgCorrigirCandidato(candidato) {
+  const perguntas = Object.entries(ECG_GABARITO).map(([q, comps]) =>
+    `Q${q} (${comps.length} componente${comps.length > 1 ? 's' : ''}):\n  Gabarito: ${comps.join(' | ')}\n  Resposta: "${candidato['q' + q] || '(em branco)'}"`
+  ).join('\n\n');
+
+  const prompt = `Você é um avaliador especialista em eletrocardiografia. Avalie se as respostas do candidato contêm os componentes do gabarito.
+
+REGRAS:
+- Aceite sinônimos e abreviações médicas (ex: RS=ritmo sinusal, BRD=bloqueio de ramo direito, FA=fibrilação atrial, SAE=sobrecarga atrial esquerda, SVE=sobrecarga ventricular esquerda, BAVT=bloqueio atrioventricular total, TV=taquicardia ventricular, MP=marcapasso, BRE=bloqueio de ramo esquerdo, BDASE=bloqueio divisional anterossuperior esquerdo, ZEI=zona/área elétrica inativa, ARV=alteração de repolarização ventricular, TPSV=taquicardia supraventricular, TRN=taquicardia por reentrada nodal, WPW=wolf-parkinson-white, etc.)
+- Para Q21: aceite qualquer menção a velocidade 50mm/s ou velocidade errada/dobrada
+- Para Q16: o candidato DEVE mencionar tanto ritmo sinusal nos átrios QUANTO marcapasso ventricular VVI
+- Seja generoso com variações de escrita desde que o conceito esteja correto
+
+QUESTÕES:
+${perguntas}
+
+Responda APENAS com JSON:
+{"resultados":[{"q":1,"presentes":[true,false,true]},{"q":2,"presentes":[true]},...]}`;
+
+  const resp = await fetch('https://ecg-proxy.vercel.app/api/corrigir', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!resp.ok) { const err = await resp.json().catch(() => ({})); throw new Error(err.error?.message || `HTTP ${resp.status}`); }
+  const data = await resp.json();
+  const match = data.content[0].text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('Resposta inválida da API');
+  return JSON.parse(match[0]);
+}
+
+async function ecgCorrigirSelecionados() {
+  const selecionados = ecgRespostas.filter((_, i) => { const c = document.getElementById('ecgChk_' + i); return c && c.checked; });
+  if (!selecionados.length) { toast('Selecione ao menos um candidato', 'e'); return; }
+  document.getElementById('ecgResultWrap').innerHTML = '';
+  document.getElementById('ecgBtnExportar').style.display = 'none';
+  ecgResultados = [];
+  const statusEl = document.getElementById('ecgStatus');
+  for (let i = 0; i < selecionados.length; i++) {
+    const candidato = selecionados[i];
+    statusEl.textContent = `⏳ Corrigindo ${i + 1}/${selecionados.length}: ${candidato.nome}...`;
+    try {
+      const resultado = await ecgCorrigirCandidato(candidato);
+      const notas = []; let totalPontos = 0;
+      for (let q = 1; q <= 30; q++) {
+        const gabComp = ECG_GABARITO[q];
+        const resQ = resultado.resultados?.find(r => r.q === q);
+        const presentes = resQ?.presentes || gabComp.map(() => false);
+        const acertos = presentes.filter(Boolean).length;
+        const nota = parseFloat((acertos / gabComp.length).toFixed(4));
+        notas.push(nota); totalPontos += nota;
+      }
+      ecgResultados.push({ nome: candidato.nome, notas, total: parseFloat(totalPontos.toFixed(2)), respostas: candidato });
+    } catch(err) {
+      ecgResultados.push({ nome: candidato.nome, notas: Array(30).fill(0), total: 0, erro: err.message });
+      toast(`Erro em ${candidato.nome}: ${err.message}`, 'e');
+    }
+    if (i < selecionados.length - 1) await new Promise(r => setTimeout(r, 800));
+  }
+  statusEl.textContent = `✅ Correção concluída! ${ecgResultados.length} candidatos processados.`;
+  document.getElementById('ecgBtnExportar').style.display = '';
+  ecgRenderTabela();
+}
+
+function ecgRenderTabela() {
+  if (!ecgResultados.length) return;
+  const wrap = document.getElementById('ecgResultWrap');
+  const thsQ = Array.from({length:30}, (_,i) => `<th style="text-align:center;min-width:40px;font-size:10px">Q${i+1}</th>`).join('');
+  const rows = ecgResultados.map(r => {
+    const totalPct = Math.round((r.total / 30) * 100);
+    const corNota = totalPct >= 75 ? '#16a34a' : totalPct >= 50 ? '#d97706' : '#dc2626';
+    const tdsQ = r.notas.map(n => {
+      const bg = n >= 1 ? '#dcfce7' : n > 0 ? '#fef9c3' : '#fee2e2';
+      return `<td style="text-align:center;background:${bg};font-size:11px;padding:6px 4px">${Math.round(n*100)}%</td>`;
+    }).join('');
+    const erroTag = r.erro ? `<span title="${r.erro}" style="color:#ef4444;margin-left:4px">⚠️</span>` : '';
+    const status = totalPct >= 75 ? '<span style="color:#16a34a;font-size:11px">✅ Aprovado</span>' : '<span style="color:#dc2626;font-size:11px">❌ Reprovado</span>';
+    return `<tr style="cursor:pointer" onclick="ecgVerDetalhe(${ecgResultados.indexOf(r)})" title="Clique para ver detalhes">
+      <td style="font-size:13px;white-space:nowrap;padding:8px 14px">${r.nome}${erroTag}</td>
+      ${tdsQ}
+      <td style="text-align:center;font-weight:700;color:${corNota};padding:8px 10px">${totalPct}%</td>
+      <td style="padding:8px 10px">${status}</td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `
+    <div style="padding:12px 16px 8px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px;font-weight:600;color:#334155">${ecgResultados.length} candidatos · clique em um nome para ver detalhes</span>
+      <span style="font-size:12px;color:#64748b">Verde = acerto total · Amarelo = parcial · Vermelho = zero · Aprovação ≥75%</span>
+    </div>
+    <div style="overflow-x:auto;padding:0 16px 16px">
+      <table class="table" style="font-size:12px">
+        <thead><tr>
+          <th style="min-width:200px;position:sticky;left:0;background:#f8fafc;z-index:1">Candidato</th>
+          ${thsQ}
+          <th style="text-align:center;min-width:60px;position:sticky;right:0;background:#f8fafc">Total</th>
+          <th style="min-width:90px">Status</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function ecgVerDetalhe(idx) {
+  const r = ecgResultados[idx];
+  if (!r) return;
+  const totalPct = Math.round((r.total / 30) * 100);
+  const status = totalPct >= 75 ? '✅ APROVADO' : '❌ REPROVADO';
+  const corStatus = totalPct >= 75 ? '#16a34a' : '#dc2626';
+  const questoes = Array.from({length:30}, (_, i) => {
+    const q = i + 1;
+    const comps = ECG_GABARITO[q];
+    const nota = r.notas[i];
+    const pct = Math.round(nota * 100);
+    const bg = pct >= 100 ? '#f0fdf4' : pct > 0 ? '#fefce8' : '#fef2f2';
+    const resposta = r.respostas?.['q' + q] || '(em branco)';
+    const compItems = comps.map(c => `<span style="display:inline-block;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:2px 7px;font-size:11px;margin:2px">${c}</span>`).join('');
+    return `<div style="background:${bg};border-radius:8px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong style="font-size:13px">Questão ${q}</strong>
+        <span style="font-weight:700;font-size:13px">${pct}%</span>
+      </div>
+      <div style="margin-bottom:4px"><span style="font-size:11px;color:#64748b">Gabarito:</span> ${compItems}</div>
+      <div style="font-size:12px;color:#334155;background:rgba(0,0,0,.04);border-radius:6px;padding:6px 10px;margin-top:4px"><em>"${resposta}"</em></div>
+    </div>`;
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:800px;max-height:90vh;display:flex;flex-direction:column">
+      <div style="padding:20px 24px;border-bottom:1px solid #e8edf5;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h2 style="margin:0;font-size:18px;color:#0f172a">${r.nome}</h2>
+          <span style="font-size:14px;font-weight:700;color:${corStatus}">${status} — ${totalPct}%</span>
+        </div>
+        <button onclick="this.closest('.ecg-modal').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#64748b">✕</button>
+      </div>
+      <div style="overflow-y:auto;padding:16px 24px;flex:1">${questoes}</div>
+    </div>`;
+  modal.className = 'ecg-modal';
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+function ecgExportarExcel() {
+  if (!ecgResultados.length) { toast('Nada para exportar', 'e'); return; }
+  const cabecalho = ['Candidato', ...Array.from({length:30}, (_,i) => `Q${i+1}`), 'Total (%)', 'Status'];
+  const linhas = ecgResultados.map(r => {
+    const totalPct = Math.round((r.total / 30) * 100);
+    return [r.nome, ...r.notas.map(n => Math.round(n * 100) + '%'), totalPct + '%', totalPct >= 75 ? 'Aprovado' : 'Reprovado'];
+  });
+  const ws = XLSX.utils.aoa_to_sheet([cabecalho, ...linhas]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Resultado ECG');
+  XLSX.writeFile(wb, `resultado-ecg-${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Excel exportado!');
+}
+
 </script>
 </body>
 </html>
