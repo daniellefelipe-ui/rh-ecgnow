@@ -6542,36 +6542,37 @@ async function confirmarImport(tipo) {
 
 const ECG_GABARITO = {
   1:  ['ritmo sinusal','bloqueio de ramo direito','sobrecarga atrial esquerda'],
-  2:  ['ritmo atrial multifocal'],
-  3:  ['ritmo sinusal','bloqueio atrioventricular de segundo grau mobitz i','bloqueio de ramo direito'],
-  4:  ['ritmo sinusal','area eletrica inativa inferior','alteracao de repolarizacao inferolateral'],
+  2:  ['ritmo ectopico atrial multifocal'],
+  3:  ['ritmo sinusal','bloqueio atrioventricular de segundo grau mobitz i','bloqueio de ramo direito','area eletrica inativa inferolateral'],
+  4:  ['ritmo sinusal','sobrecarga atrial esquerda','area eletrica inativa inferior'],
   5:  ['ritmo sinusal','supradesnivelamento de segmento st parede inferolateral','imagem em espelho'],
   6:  ['troca de eletrodos'],
-  7:  ['bloqueio atrioventricular 2:1','bloqueio de ramo esquerdo'],
+  7:  ['bloqueio atrioventricular 2:1','bloqueio de ramo esquerdo','desvio do eixo para a direita'],
   8:  ['bloqueio atrioventricular total','bloqueio de ramo direito','bloqueio divisional anterossuperior esquerdo'],
-  9:  ['taquicardia supraventricular'],
+  9:  ['taquicardia supraventricular por reentrada nodal'],
   10: ['ritmo juncional bradicardico'],
-  11: ['taquicardia sinusal','sobrecarga ventricular esquerda'],
-  12: ['ritmo sinusal','disturbio de conducao pelo ramo direito','bloqueio divisional anterossuperior esquerdo'],
+  11: ['taquicardia sinusal','sobrecarga ventricular esquerda','troca de eletrodos v1 e v2'],
+  12: ['taquicardia sinusal','desvio de eixo para a direita','disturbio de conducao pelo ramo direito','bloqueio divisional anterossuperior esquerdo'],
   13: ['marcapasso modo aai','bloqueio de ramo esquerdo'],
   14: ['fibrilacao atrial','marcapasso ventricular vvi'],
-  15: ['marcapasso modo vvi'],
-  16: ['ritmo sinusal para os atrios','marcapasso ventricular vvi'],
+  15: ['taquicardia atrial','marcapasso ventricular vvi'],
+  16: ['BONUS'], // Q16: questão de especialista — todos ganham 1.0 automaticamente
   17: ['fibrilacao atrial','sobrecarga ventricular esquerda'],
   18: ['ritmo sinusal','area eletrica inativa anterior','area eletrica inativa inferior','sobrecarga ventricular esquerda'],
   19: ['ritmo sinusal','dentro dos limites da normalidade'],
   20: ['marcapasso modo aai','sobrecarga ventricular esquerda'],
   21: ['velocidade incorreta 50mm/s'],
-  22: ['bloqueio atrioventricular total'],
+  22: ['bloqueio atrioventricular total','progressao lenta da onda r'],
   23: ['ritmo sinusal','pre-excitacao ventricular intermitente'],
   24: ['taquicardia ventricular'],
   25: ['flutter atrial','intervalo qtc prolongado'],
   26: ['taquicardia supraventricular por reentrada nodal'],
   27: ['ritmo sinusal','dentro da normalidade para a idade'],
   28: ['ritmo sinusal','sobrecarga biatrial'],
-  29: ['ritmo sinusal','extrassistole ventricular'],
+  29: ['ritmo sinusal','extrassistole ventricular','interferencia'],
   30: ['mobitz i tem alargamento progressivo do pr','mobitz ii tem bloqueio subito com pr fixo'],
 };
+const ECG_BONUS_QUESTOES = [16];
 
 let ecgRespostas = [];
 let ecgResultados = [];
@@ -6631,9 +6632,11 @@ function ecgSelecionarTodos(val) {
 }
 
 async function ecgCorrigirCandidato(candidato) {
-  const perguntas = Object.entries(ECG_GABARITO).map(([q, comps]) =>
-    `Q${q} (${comps.length} componente${comps.length > 1 ? 's' : ''}):\n  Gabarito: ${comps.join(' | ')}\n  Resposta: "${candidato['q' + q] || '(em branco)'}"`
-  ).join('\n\n');
+  const perguntas = Object.entries(ECG_GABARITO)
+    .filter(([q]) => !ECG_BONUS_QUESTOES.includes(Number(q)))
+    .map(([q, comps]) =>
+      `Q${q} (${comps.length} componente${comps.length > 1 ? 's' : ''}):\n  Gabarito: ${comps.join(' | ')}\n  Resposta: "${candidato['q' + q] || '(em branco)'}"`
+    ).join('\n\n');
 
   const prompt = `Você é um avaliador especialista em eletrocardiografia. Avalie se as respostas do candidato contêm os componentes do gabarito.
 
@@ -6676,10 +6679,15 @@ async function ecgCorrigirSelecionados() {
       const notas = []; let totalPontos = 0;
       for (let q = 1; q <= 30; q++) {
         const gabComp = ECG_GABARITO[q];
-        const resQ = resultado.resultados?.find(r => r.q === q);
-        const presentes = resQ?.presentes || gabComp.map(() => false);
-        const acertos = presentes.filter(Boolean).length;
-        const nota = parseFloat((acertos / gabComp.length).toFixed(4));
+        let nota;
+        if (ECG_BONUS_QUESTOES.includes(q)) {
+          nota = 1;
+        } else {
+          const resQ = resultado.resultados?.find(r => r.q === q);
+          const presentes = resQ?.presentes || gabComp.map(() => false);
+          const acertos = presentes.filter(Boolean).length;
+          nota = parseFloat((acertos / gabComp.length).toFixed(4));
+        }
         notas.push(nota); totalPontos += nota;
       }
       ecgResultados.push({ nome: candidato.nome, notas, total: parseFloat(totalPontos.toFixed(2)), respostas: candidato });
