@@ -1624,15 +1624,17 @@ const db      = firebase.firestore();
 const storage = firebase.storage();
 
 // ── Auth ──────────────────────────────────────────────────
+// ACESSO TEMPORÁRIO SEM LOGIN — remover após redefinir senha
+document.getElementById('loginPage').style.display = 'none';
+document.getElementById('appPage').style.display  = 'flex';
+document.getElementById('userEmail').textContent  = 'danielle.felipe@ecgnow.com.br';
+loadAll();
+
 auth.onAuthStateChanged(user => {
   if (user) {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('appPage').style.display  = 'flex';
     document.getElementById('userEmail').textContent  = user.email;
-    loadAll();
-  } else {
-    document.getElementById('loginPage').style.display = 'flex';
-    document.getElementById('appPage').style.display   = 'none';
   }
 });
 
@@ -6647,7 +6649,7 @@ ${perguntas}
 Responda APENAS com JSON:
 {"resultados":[{"q":1,"presentes":[true,false,true]},{"q":2,"presentes":[true]},...]}`;
 
-  const resp = await fetch('https://ecg-proxy.vercel.app/api/corrigir', {
+  const resp = await fetch('https://ecg-proxy-18dw.vercel.app/api/corrigir', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }),
