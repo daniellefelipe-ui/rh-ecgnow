@@ -834,6 +834,10 @@
         <input type="text" class="form-input" id="colabSetor" placeholder="Ex: Holter, TI, CS">
       </div>
       <div class="form-group">
+        <label class="form-label">Líder</label>
+        <input type="text" class="form-input" id="colabLider" placeholder="Nome do líder responsável">
+      </div>
+      <div class="form-group">
         <label class="form-label">Cargo</label>
         <input type="text" class="form-input" id="colabCargo" placeholder="Ex: Analista de Suporte">
       </div>
@@ -955,6 +959,10 @@
       <div class="form-group">
         <label class="form-label">Período (rótulo) *</label>
         <input type="text" class="form-input" id="esatPeriodo" placeholder="Ex: Junho/2024, 1ºSem/2025">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Líder</label>
+        <input type="text" class="form-input" id="esatLider" placeholder="Nome do líder responsável pelo time">
       </div>
       <div class="form-group">
         <label class="form-label">Ordem (para ordenação)</label>
@@ -1904,7 +1912,7 @@ function toggleHorasMensais() {
 }
 
 function openColabModal() {
-  ['colabId','colabNome','colabSetor','colabCargo','colabAdmissao','colabDemissao','colabNascimento','colabEmail','colabCpf','colabCnpj','colabHoras'].forEach(id => document.getElementById(id).value = '');
+  ['colabId','colabNome','colabSetor','colabLider','colabCargo','colabAdmissao','colabDemissao','colabNascimento','colabEmail','colabCpf','colabCnpj','colabHoras'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('colabTipo').value   = '';
   document.getElementById('colabStatus').value = 'Ativo';
   document.getElementById('colabGenero').value = '';
@@ -1918,6 +1926,7 @@ function editColab(id) {
   document.getElementById('colabId').value       = c.id;
   document.getElementById('colabNome').value     = c.nome||'';
   document.getElementById('colabSetor').value    = c.setor||'';
+  document.getElementById('colabLider').value    = c.lider||'';
   document.getElementById('colabCargo').value    = c.cargo||'';
   document.getElementById('colabTipo').value     = c.tipo_contrato||'';
   document.getElementById('colabStatus').value   = c.status||'Ativo';
@@ -1943,6 +1952,7 @@ async function saveColab() {
   const payload = {
     nome,
     setor:         document.getElementById('colabSetor').value.trim()||'',
+    lider:         document.getElementById('colabLider').value.trim()||'',
     cargo:         document.getElementById('colabCargo').value.trim()||'',
     tipo_contrato: document.getElementById('colabTipo').value||'',
     status:        document.getElementById('colabStatus').value,
@@ -3620,8 +3630,9 @@ function calcEsat() {
 }
 
 function openEsatModal() {
-  document.getElementById('esatId').value = '';
+  document.getElementById('esatId').value      = '';
   document.getElementById('esatPeriodo').value = '';
+  document.getElementById('esatLider').value   = '';
   document.getElementById('esatOrdem').value   = allEsat.length + 1;
   document.getElementById('esatMeta').value    = '4.50';
   ['esatMedia','esatPctMeta'].forEach(id=>document.getElementById(id).value='');
@@ -3634,6 +3645,7 @@ function editEsat(id) {
   const r = allEsat.find(x=>x.id===id); if (!r) return;
   document.getElementById('esatId').value      = r.id;
   document.getElementById('esatPeriodo').value = r.periodo||'';
+  document.getElementById('esatLider').value   = r.lider||'';
   document.getElementById('esatOrdem').value   = r.ordem||'';
   document.getElementById('esatMeta').value    = r.meta||4.5;
   _buildEsatNotasGrid(r.notas||[]);
@@ -3662,7 +3674,9 @@ async function saveEsat() {
   const acima_meta  = vals.filter(n=>n>=meta).length;
   const abaixo_meta = vals.length - acima_meta;
   const payload = {
-    periodo, meta, ordem: parseInt(document.getElementById('esatOrdem').value)||0,
+    periodo, meta,
+    lider: document.getElementById('esatLider').value.trim()||'',
+    ordem: parseInt(document.getElementById('esatOrdem').value)||0,
     media: parseFloat(media.toFixed(2)),
     total_respostas: vals.length, acima_meta, abaixo_meta,
     pct_acima_meta:  parseFloat((acima_meta/vals.length*100).toFixed(1)),
