@@ -1390,7 +1390,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">PIN de Acesso *</label>
-        <input type="text" class="form-input" id="usuarioSenha" placeholder="ex: 1234" maxlength="8">
+        <input type="password" class="form-input" id="usuarioSenha" placeholder="Novo PIN (deixe em branco para manter)" maxlength="8" autocomplete="new-password">
       </div>
       <div class="form-group full">
         <label class="form-label">Perfil *</label>
@@ -1615,6 +1615,27 @@
 <div id="toast"></div>
 
 <script>
+// ── Sanitização XSS ───────────────────────────────────────
+// Escapa caracteres HTML antes de inserir dados do banco via innerHTML
+function _esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ── Hash de PIN (SHA-256 via Web Crypto API) ───────────────
+async function _hashPin(pin) {
+  const encoded = new TextEncoder().encode(String(pin).trim());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 firebase.initializeApp({
   apiKey: "AIzaSyBopJe43OvWuA-vuHWGCTqQ_ApreNf_kWA",
   authDomain: "rh-ecgnow.firebaseapp.com",
@@ -1868,7 +1889,7 @@ function renderColabTable(list) {
   wrap.innerHTML = `<table class="table">
     <thead><tr><th>Nome</th><th>Setor</th><th>Cargo</th><th>Contrato</th><th>Gênero</th><th>Nascimento</th><th>Idade</th><th>Tempo de Casa</th><th>Admissão</th><th>E-mail</th><th>CPF/CNPJ</th><th>Status</th><th></th></tr></thead>
     <tbody>${list.map(c => `<tr>
-      <td><strong style="color:#1a2535">${c.nome}</strong></td>
+      <td><strong style="color:#1a2535">${_esc(c.nome)}</strong></td>
       <td>${c.setor||'—'}</td>
       <td>${c.cargo||'—'}</td>
       <td><span class="badge ${tipoClass[c.tipo_contrato]||'badge-green'}">${c.tipo_contrato||'—'}</span></td>
@@ -2095,7 +2116,7 @@ function renderHcTable(hc, ano) {
       const colab  = allColabs.find(c => c.id === r.colaborador_id);
       const cargo  = r.cargo || colab?.cargo || '—';
       return `<tr>
-        <td><strong style="color:#1a2535;white-space:nowrap">${r.colaborador_nome||'—'}</strong></td>
+        <td><strong style="color:#1a2535;white-space:nowrap">${_esc(r.colaborador_nome)||'—'}</strong></td>
         <td style="white-space:nowrap">${cargo}</td>
         <td style="text-align:center">${r.idade||'—'}</td>
         <td style="text-align:center"><span class="badge ${tc==='CLT'?'badge-blue':'badge-orange'}">${tc}</span></td>
@@ -3844,7 +3865,7 @@ function calcVT() {
       const nomeEsc = r.colaborador_nome.replace(/'/g,"\\'");
       const nomeId  = r.colaborador_nome.replace(/[^a-zA-Z0-9]/g,'_');
       return `<tr>
-        <td><strong style="color:#1a2535">${r.colaborador_nome}</strong></td>
+        <td><strong style="color:#1a2535">${_esc(r.colaborador_nome)}</strong></td>
         <td><span class="badge ${ativo?'badge-green':'badge-red'}">${ativo?'Ativo':'Inativo'}</span></td>
         <td><input type="number" class="form-input" style="width:110px;padding:6px 10px"
              value="${vd}" step="0.01" min="0"
@@ -3985,7 +4006,7 @@ function renderFinConsolidado() {
     </tr></thead>
     <tbody>
       ${rows.map(r => `<tr>
-        <td><strong style="color:#1a2535">${r.nome}</strong></td>
+        <td><strong style="color:#1a2535">${_esc(r.nome)}</strong></td>
         ${tipos.map(t=>`<td class="currency">${r.vals[t]>0?fmt(r.vals[t]):'<span style="color:#cbd5e1">—</span>'}</td>`).join('')}
         <td><strong class="currency" style="color:#0b4e7d">${r.totalColab>0?fmt(r.totalColab):'—'}</strong></td>
       </tr>`).join('')}
@@ -4052,7 +4073,7 @@ function renderFinTable() {
     </tr></thead>
     <tbody>
       ${data.map(r => `<tr>
-        <td><strong style="color:#1a2535">${r.colaborador_nome||'—'}</strong></td>
+        <td><strong style="color:#1a2535">${_esc(r.colaborador_nome)||'—'}</strong></td>
         ${FIN_MESES.map(m => `<td class="currency" style="white-space:nowrap">${(r[m]||0)>0?fmt(r[m]||0):'<span style="color:#cbd5e1">—</span>'}</td>`).join('')}
         <td><strong class="currency" style="color:#0b4e7d">${fmt(r.total||0)}</strong></td>
         <td><div style="display:flex;gap:6px">
@@ -4310,7 +4331,7 @@ function renderFerPeriodos() {
     <tbody>${allFerPeriodos.map(p => {
       const {gozados,agendados,saldo} = _calcSaldo(p);
       return `<tr>
-        <td><strong style="color:#1a2535">${p.colaborador_nome}</strong></td>
+        <td><strong style="color:#1a2535">${_esc(p.colaborador_nome)}</strong></td>
         <td style="font-size:12px;color:#64748b">${_fmtDate(p.data_admissao)}</td>
         <td style="color:#64748b;font-size:12px">${_fmtDate(p.periodo_inicio)} – ${_fmtDate(p.periodo_fim)}</td>
         <td style="font-size:12px">${_fmtDate(p.data_limite)}</td>
@@ -4339,13 +4360,13 @@ function renderFerSolicitacoes() {
       const dt = s.criado_em?.toDate ? s.criado_em.toDate().toLocaleDateString('pt-BR') : '—';
       const obs = [s.obs_colaborador,s.obs_lider,s.obs_rh].filter(Boolean).join(' · ');
       return `<tr>
-        <td><strong style="color:#1a2535">${s.colaborador_nome}</strong></td>
+        <td><strong style="color:#1a2535">${_esc(s.colaborador_nome)}</strong></td>
         <td style="font-size:12px">${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</td>
         <td style="text-align:center"><strong>${s.dias}</strong></td>
         <td><span class="badge ${s.tipo==='ferias_e_abono'?'badge-orange':s.tipo==='abono_pecuniario'?'badge-orange':'badge-blue'}">${s.tipo==='ferias_e_abono'?'Férias + Abono':s.tipo==='abono_pecuniario'?'Abono Pecuniário':s.tipo==='abono'?'Abono':'Férias'}</span></td>
         <td><span class="badge ${statusClass[s.status]||'badge-blue'}">${statusLabel[s.status]||s.status}</span></td>
         <td style="font-size:11px;color:#94a3b8">${dt}</td>
-        <td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${obs}">${obs||'—'}</td>
+        <td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_esc(obs)}">${_esc(obs)||'—'}</td>
         <td>${(s.status==='pendente'||s.status==='aprovado_lider')
           ?`<button class="btn btn-sm btn-primary" onclick="openSolicModal('${s.id}','rh')">Aprovar (RH)</button>`
           :''}</td>
@@ -4402,8 +4423,8 @@ function renderFerUsuarios() {
         <td><strong style="color:#1a2535">${u.nome}</strong></td>
         <td style="color:#64748b;font-size:12px">${u.email}</td>
         <td>${u.roles.map(r=>`<span class="badge ${rClass(r)}" style="margin-right:3px">${rLabel(r)}</span>`).join('')}</td>
-        <td style="font-size:12px;color:#64748b">${u.lider_nome||'—'}</td>
-        <td style="font-size:13px;font-family:monospace;letter-spacing:2px">${cad?.pin ? cad.pin : '<span style="color:#94a3b8">—</span>'}</td>
+        <td style="font-size:12px;color:#64748b">${_esc(u.lider_nome)||'—'}</td>
+        <td style="font-size:13px;font-family:monospace;letter-spacing:2px">${cad?.pin ? '<span style="color:#15803d">••••</span>' : '<span style="color:#94a3b8">—</span>'}</td>
         <td style="white-space:nowrap">
           ${!cad
             ?`<button class="btn btn-sm btn-primary" onclick="openUsuarioModal(null,'${u.email}')">Cadastrar</button>`
@@ -4541,7 +4562,7 @@ function openSolicModal(id, step) {
   const stepLabel = {pendente:'Aguardando Líder',aprovado_lider:'Aprovada pelo Líder – Aguardando RH',aprovado_rh:'Aprovada (RH)',reprovado_lider:'Reprovada (Líder)',reprovado_rh:'Reprovada (RH)'};
   document.getElementById('solicInfoWrap').innerHTML = `
     <div style="background:#f8fafc;border-radius:10px;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Colaborador</div><strong>${s.colaborador_nome}</strong></div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Colaborador</div><strong>${_esc(s.colaborador_nome)}</strong></div>
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Período</div>${_fmtDate(s.data_inicio)} – ${_fmtDate(s.data_fim)}</div>
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Dias</div><strong>${s.dias} dias</strong>${s.tipo==='ferias_e_abono'?` (${s.dias_ferias||s.dias-10} dias de férias + 10 dias abono)`:s.tipo==='abono_pecuniario'?' (Abono Pecuniário)':s.tipo==='abono'?' (Abono)':' (Férias)'}</div>
       <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Status</div>${stepLabel[s.status]||s.status}</div>
@@ -4599,7 +4620,7 @@ function openUsuarioModal(id, emailPre) {
     document.getElementById('btnSaveUsuario').textContent    = 'Salvar Alterações';
     document.getElementById('usuarioNome').value       = u.nome||'';
     document.getElementById('usuarioEmail').value      = u.email||'';
-    document.getElementById('usuarioSenha').value      = u.pin||'';
+    document.getElementById('usuarioSenha').value      = ''; // PIN não é exibido por segurança; deixe em branco para manter o atual
     document.getElementById('usuarioLiderNome').value  = u.lider_nome||'';
     document.getElementById('usuarioLiderEmail').value = u.lider_email||'';
     document.getElementById('rolColaborador').checked  = (u.roles||['colaborador']).includes('colaborador');
@@ -4633,32 +4654,42 @@ function closeUsuarioModal() { document.getElementById('usuarioModal').classList
 async function saveUsuario() {
   const nome  = document.getElementById('usuarioNome').value.trim();
   const email = document.getElementById('usuarioEmail').value.trim().toLowerCase();
-  const pin   = document.getElementById('usuarioSenha').value.trim();
-  if (!nome||!email||!pin||pin.length<4) { toast('Preencha todos os campos (PIN mín. 4 caracteres)','e'); return; }
+  const pinRaw = document.getElementById('usuarioSenha').value.trim();
+  const existingId = document.getElementById('usuarioId').value;
+
+  // PIN é obrigatório apenas no cadastro; na edição, deixar em branco mantém o atual
+  if (!nome || !email) { toast('Preencha nome e e-mail.','e'); return; }
+  if (!existingId && (!pinRaw || pinRaw.length < 4)) { toast('PIN obrigatório (mín. 4 dígitos) no cadastro.','e'); return; }
+  if (pinRaw && pinRaw.length < 4) { toast('PIN deve ter no mínimo 4 dígitos.','e'); return; }
+
   const roles = ['colaborador','lider','rh'].filter(r => document.getElementById('rol'+r.charAt(0).toUpperCase()+r.slice(1)).checked);
   const userData = {
-    nome, email, pin, roles,
+    nome, email, roles,
     lider_nome:  document.getElementById('usuarioLiderNome').value.trim(),
     lider_email: document.getElementById('usuarioLiderEmail').value.trim(),
   };
+
+  // Só atualiza o PIN se um novo foi informado
+  if (pinRaw) userData.pin = await _hashPin(pinRaw);
+
   try {
-    const existingId = document.getElementById('usuarioId').value;
     let docId;
     if (existingId) {
       await db.collection('usuarios').doc(existingId).update(userData);
       docId = existingId;
-      const idx = allFerUsuarios.findIndex(u=>u.id===existingId);
-      if (idx>=0) allFerUsuarios[idx] = {id:docId,...userData};
+      const idx = allFerUsuarios.findIndex(u => u.id === existingId);
+      if (idx >= 0) allFerUsuarios[idx] = {id:docId, ...allFerUsuarios[idx], ...userData};
     } else {
       docId = 'email_' + email.replace(/[@.]/g,'_');
-      await db.collection('usuarios').doc(docId).set({...userData, criado_em:firebase.firestore.FieldValue.serverTimestamp()});
-      const exIdx = allFerUsuarios.findIndex(u=>u.email===email);
-      if (exIdx>=0) allFerUsuarios[exIdx]={id:docId,...userData};
-      else allFerUsuarios.push({id:docId,...userData});
+      await db.collection('usuarios').doc(docId).set({...userData, criado_em: firebase.firestore.FieldValue.serverTimestamp()});
+      const exIdx = allFerUsuarios.findIndex(u => u.email === email);
+      if (exIdx >= 0) allFerUsuarios[exIdx] = {id:docId, ...userData};
+      else allFerUsuarios.push({id:docId, ...userData});
     }
-    closeUsuarioModal(); renderFerUsuarios();
-    toast(existingId ? 'Usuário atualizado!' : `Usuário criado! PIN: ${pin}`);
-  } catch(e) { toast('Erro: '+e.message,'e'); }
+    closeUsuarioModal();
+    renderFerUsuarios();
+    toast(existingId ? 'Usuário atualizado!' : 'Usuário criado! Compartilhe o PIN diretamente com o colaborador.');
+  } catch(e) { toast('Erro: ' + e.message,'e'); }
 }
 
 async function seedFeriasPDF() {
@@ -5502,7 +5533,7 @@ function renderAvalCiclos() {
       ? '<span class="badge badge-green">Aberto</span>'
       : '<span class="badge badge-blue">Fechado</span>';
     rows += `<tr>
-      <td><b>${c.nome}</b></td>
+      <td><b>${_esc(c.nome)}</b></td>
       <td>${statusBadge}</td>
       <td style="text-align:center">${avaliados.size}</td>
       <td style="text-align:center">${respostas.length}</td>
@@ -5525,8 +5556,8 @@ function renderAvalCiclos() {
 
 // ── Avaliação Manual ───────────────────────────────────────
 function openAvalManualModal(id) {
-  const colabOpts = allColabs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
-  const cicloOpts = AVAL_CICLOS_FIXOS.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  const colabOpts = allColabs.map(c => `<option value="${c.id}">${_esc(c.nome)}</option>`).join('');
+  const cicloOpts = AVAL_CICLOS_FIXOS.map(c => `<option value="${c.id}">${_esc(c.nome)}</option>`).join('');
   document.getElementById('avalManualColab').innerHTML = '<option value="">Selecione</option>' + colabOpts;
   document.getElementById('avalManualCiclo').innerHTML = cicloOpts;
   document.getElementById('avalManualNota').value = '';
@@ -5604,7 +5635,7 @@ async function saveAvalManual() {
 // ── Importar ───────────────────────────────────────────────
 function renderAvalImportar() {
   const cicloOpts = AVAL_CICLOS_FIXOS.map(c =>
-    `<option value="${c.id}">${c.nome}</option>`).join('');
+    `<option value="${c.id}">${_esc(c.nome)}</option>`).join('');
 
   document.getElementById('avalWrap').innerHTML = `
     <div style="max-width:600px">
@@ -5678,7 +5709,7 @@ function abrirRevisaoAval() {
   const notaGeralCol = numericCols.find(k => _normKey(k).includes('notageral') || _normKey(k).includes('notager'));
 
   const colabOpts = '<option value="">— nome livre —</option>' +
-    allColabs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+    allColabs.map(c => `<option value="${c.id}">${_esc(c.nome)}</option>`).join('');
 
   let tableRows = '';
   rows.forEach((row, i) => {
@@ -5809,7 +5840,7 @@ let _avalCicloSelecionado = '2025';
 
 function renderAvalResultados() {
   const cicloOpts = AVAL_CICLOS_FIXOS.map(c =>
-    `<option value="${c.id}" ${c.id===_avalCicloSelecionado?'selected':''}>${c.nome}</option>`).join('');
+    `<option value="${c.id}" ${c.id===_avalCicloSelecionado?'selected':''}>${_esc(c.nome)}</option>`).join('');
 
   // Calcular resultados para o ciclo selecionado
   const respostasC = allAvalRespostas.filter(r => r.ciclo_id === _avalCicloSelecionado);
@@ -5924,7 +5955,7 @@ function verDetalheAval(avaliadoKey, cicloId) {
   respostas.forEach(r => {
     html += `<div style="margin-bottom:20px;border:1px solid #e2e8f0;border-radius:10px;padding:16px">
       <div style="display:flex;justify-content:space-between;margin-bottom:12px">
-        <b>${r.avaliador_nome||'Avaliador desconhecido'}</b>
+        <b>${_esc(r.avaliador_nome)||'Avaliador desconhecido'}</b>
         <span class="badge ${r.tipo==='principal'?'badge-blue':'badge-orange'}">${r.tipo==='principal'?'Principal 80%':'Secundário 20%'}</span>
       </div>`;
 
@@ -6621,7 +6652,7 @@ function ecgRenderSelecao() {
   const itens = ecgRespostas.map((c, i) => `
     <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
       <input type="checkbox" id="ecgChk_${i}" checked style="width:15px;height:15px;cursor:pointer">
-      <span style="font-size:13px;color:#334155">${c.nome}</span>
+      <span style="font-size:13px;color:#334155">${_esc(c.nome)}</span>
     </label>`).join('');
   wrap.innerHTML = `
     <div style="padding:12px 16px 4px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f1f5f9">
@@ -6724,7 +6755,7 @@ function ecgRenderTabela() {
     const erroTag = r.erro ? `<span title="${r.erro}" style="color:#ef4444;margin-left:4px">⚠️</span>` : '';
     const status = totalPct >= 75 ? '<span style="color:#16a34a;font-size:11px">✅ Aprovado</span>' : '<span style="color:#dc2626;font-size:11px">❌ Reprovado</span>';
     return `<tr style="cursor:pointer" onclick="ecgVerDetalhe(${ecgResultados.indexOf(r)})" title="Clique para ver detalhes">
-      <td style="font-size:13px;white-space:nowrap;padding:8px 14px">${r.nome}${erroTag}</td>
+      <td style="font-size:13px;white-space:nowrap;padding:8px 14px">${_esc(r.nome)}${erroTag}</td>
       ${tdsQ}
       <td style="text-align:center;font-weight:700;color:${corNota};padding:8px 10px">${totalPct}%</td>
       <td style="padding:8px 10px">${status}</td>
@@ -6779,7 +6810,7 @@ function ecgVerDetalhe(idx) {
     <div style="background:#fff;border-radius:12px;width:100%;max-width:800px;max-height:90vh;display:flex;flex-direction:column">
       <div style="padding:20px 24px;border-bottom:1px solid #e8edf5;display:flex;justify-content:space-between;align-items:center">
         <div>
-          <h2 style="margin:0;font-size:18px;color:#0f172a">${r.nome}</h2>
+          <h2 style="margin:0;font-size:18px;color:#0f172a">${_esc(r.nome)}</h2>
           <span style="font-size:14px;font-weight:700;color:${corStatus}">${status} — ${totalPct}%</span>
         </div>
         <button onclick="this.closest('.ecg-modal').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#64748b">✕</button>
