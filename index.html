@@ -1628,17 +1628,15 @@ const db      = firebase.firestore();
 const storage = firebase.storage();
 
 // ── Auth ──────────────────────────────────────────────────
-// ACESSO TEMPORÁRIO SEM LOGIN — remover após redefinir senha
-document.getElementById('loginPage').style.display = 'none';
-document.getElementById('appPage').style.display  = 'flex';
-document.getElementById('userEmail').textContent  = 'danielle.felipe@ecgnow.com.br';
-loadAll();
-
 auth.onAuthStateChanged(user => {
   if (user) {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('appPage').style.display  = 'flex';
     document.getElementById('userEmail').textContent  = user.email;
+    loadAll();
+  } else {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('appPage').style.display   = 'none';
   }
 });
 
