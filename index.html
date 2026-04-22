@@ -1615,6 +1615,11 @@
 <div id="toast"></div>
 
 <script>
+// ── Log seguro (sem exposição em produção) ─────────────────
+const _IS_DEV = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+function _log(...args)  { if (_IS_DEV) console.log(...args); }
+function _logErr(ctx, e){ if (_IS_DEV) console.error('[' + ctx + ']', e); }
+
 // ── Sanitização XSS ───────────────────────────────────────
 // Escapa caracteres HTML antes de inserir dados do banco via innerHTML
 function _esc(str) {
@@ -1648,9 +1653,22 @@ const auth    = firebase.auth();
 const db      = firebase.firestore();
 const storage = firebase.storage();
 
+// ── Controle de acesso — e-mails autorizados no painel RH ──
+// Para adicionar outro administrador, inclua o e-mail nesta lista
+const ADMIN_EMAILS = [
+  'danielle.felipe@ecgnow.com.br'
+];
+
 // ── Auth ──────────────────────────────────────────────────
-auth.onAuthStateChanged(user => {
+auth.onAuthStateChanged(async user => {
   if (user) {
+    if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+      await auth.signOut();
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('appPage').style.display   = 'none';
+      document.getElementById('loginError').textContent  = 'Acesso não autorizado para este e-mail.';
+      return;
+    }
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('appPage').style.display  = 'flex';
     document.getElementById('userEmail').textContent  = user.email;
@@ -2313,7 +2331,7 @@ async function loadAbs() {
     renderAbsKpis();
     renderAbsChart();
     renderAbsTable();
-  } catch(e) { console.error(e); }
+  } catch(e) { _logErr('geral', e); }
 }
 
 function renderAbsKpis() {
@@ -2618,7 +2636,7 @@ async function loadRot() {
     renderRotKpis();
     renderRotChart();
     renderRotTable();
-  } catch(e) { console.error('loadRot', e); }
+  } catch(e) { _logErr('loadRot', e); }
 }
 
 function renderRotKpis() {
@@ -2824,7 +2842,7 @@ async function loadRec() {
     renderRecKpis();
     renderRecCharts();
     renderRecTable();
-  } catch(e) { console.error('loadRec', e); }
+  } catch(e) { _logErr('loadRec', e); }
 }
 
 function renderRecKpis() {
@@ -3103,7 +3121,7 @@ async function loadTrein() {
     renderTreinKpis();
     renderTreinChart();
     renderTreinTable();
-  } catch(e) { console.error('loadTrein', e); }
+  } catch(e) { _logErr('loadTrein', e); }
 }
 
 function renderTreinKpis() {
@@ -3306,7 +3324,7 @@ async function loadEnps() {
     renderEnpsKpis();
     renderEnpsChart();
     renderEnpsTable();
-  } catch(e) { console.error('loadEnps', e); }
+  } catch(e) { _logErr('loadEnps', e); }
 }
 
 function renderEnpsKpis() {
@@ -3504,7 +3522,7 @@ async function loadEsat() {
       const snap2 = await db.collection('esat').get();
       allEsat = snap2.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b)=>(a.ordem||0)-(b.ordem||0));
       renderEsatKpis(); renderEsatChart(); renderEsatTable();
-    } catch(e2) { console.error('loadEsat', e2); }
+    } catch(e2) { _logErr('loadEsat', e2); }
   }
 }
 
@@ -3805,7 +3823,7 @@ async function loadFin() {
     // Inicializa mês do consolidado com o mês atual
     const selMes = document.getElementById('finMesConsolid');
     if (selMes && selMes.value === '0') selMes.value = new Date().getMonth();
-  } catch(e) { console.error('loadFin', e); }
+  } catch(e) { _logErr('loadFin', e); }
 }
 
 function setFinTab(tipo) {
@@ -4258,7 +4276,7 @@ async function loadFerias() {
     allFerUsuarios = snapU.docs.map(d => ({ id:d.id, ...d.data() }));
     buildFeriasKpis();
     setFerTab(_ferTab);
-  } catch(e) { console.error('loadFerias:', e); }
+  } catch(e) { _logErr('loadFerias', e); }
 }
 
 function buildFeriasKpis() {
@@ -4740,7 +4758,7 @@ async function _w3fSend(to, subject, message) {
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ access_key: W3F_KEY, to, subject, from_name: 'RH ECGNow', message }),
     });
-  } catch(e) { console.error('[Web3Forms] erro:', e); }
+  } catch(e) { _logErr('Web3Forms', e); }
 }
 
 function enviarEmailNotificacao(tipo, solic) {
@@ -4920,7 +4938,7 @@ async function loadCargos() {
     allCargos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderCargosList(allCargos);
     renderCargosKpis();
-  } catch(e) { console.error('loadCargos', e); }
+  } catch(e) { _logErr('loadCargos', e); }
 }
 
 function renderCargosKpis() {
@@ -5130,7 +5148,7 @@ async function onCargoPdfSelect(input) {
     document.getElementById('cargoPdfNome').textContent = '✅ ' + _cargoPdfFile.name;
     toast('PDF importado! Verifique os dados e salve.');
   } catch(e) {
-    console.error('PDF parse:', e);
+    _logErr('PDF parse', e);
     document.getElementById('cargoPdfNome').textContent = _cargoPdfFile.name;
     toast('Erro ao ler PDF. Preencha manualmente.', 'e');
   }
@@ -5485,7 +5503,7 @@ async function loadAvaliacao() {
     allAvalManuais   = snM.docs.map(d => ({id:d.id,...d.data()}));
     buildAvalKpis();
     setAvalTab(_avalTab);
-  } catch(e) { console.error('loadAvaliacao:', e); }
+  } catch(e) { _logErr('loadAvaliacao', e); }
 }
 
 function buildAvalKpis() {
@@ -6020,7 +6038,7 @@ async function loadPlano() {
     allPlanoRadar     = snR.docs.map(d => ({id:d.id,...d.data()}));
     buildPlanoKpis();
     setPlanoTab(_planoTab);
-  } catch(e) { console.error('loadPlano:', e); }
+  } catch(e) { _logErr('loadPlano', e); }
 }
 
 function buildPlanoKpis() {
