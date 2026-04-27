@@ -1687,6 +1687,9 @@ const auth    = firebase.auth();
 const db      = firebase.firestore();
 const storage = firebase.storage();
 
+// Sessão só dura enquanto o browser está aberto — fecha o browser, pede login de novo
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+
 // ── Controle de acesso — e-mails autorizados no painel RH ──
 // Para adicionar outro administrador, inclua o e-mail nesta lista
 const ADMIN_EMAILS = [
