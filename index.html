@@ -5770,21 +5770,82 @@ function renderAvalImportar() {
     </div>`;
 }
 
+function _readWorkbook(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const bytes = new Uint8Array(e.target.result);
+        const text  = new TextDecoder('utf-8').decode(bytes);
+        resolve(XLSX.read(text, { type: 'string', raw: false }));
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function _detectTipoAba(nome) {
+  const n = nome.toLowerCase();
+  if (n.includes('liderança') || n.includes('lideranca') || n.includes('coo') || n.includes('supervisão') || n.includes('supervisao')) return 'secundario';
+  return 'principal';
+}
+
 async function previewAvalImport(input) {
   const file = input.files[0];
   if (!file) return;
   const prev = document.getElementById('avalImportPreview');
   prev.innerHTML = 'Lendo arquivo...';
   try {
-    const rows = await _parseCSV(file);
-    const valid = rows.filter(r => Object.values(r).some(v => v !== ''));
-    if (!valid.length) { prev.innerHTML = '<span style="color:#dc2626">Arquivo vazio.</span>'; return; }
-    _avalImportCache = valid;
-    prev.innerHTML = `<span style="color:#15803d">✓ ${valid.length} respostas encontradas.</span>
-      <button class="ds-btn ds-btn-primary ds-btn-sm" style="margin-left:12px" onclick="abrirRevisaoAval()">Revisar e Importar</button>`;
+    const wb = await _readWorkbook(file);
+    window._avalWb = wb;
+
+    if (wb.SheetNames.length === 1) {
+      // arquivo CSV ou Excel de aba única — comportamento original
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
+                      .filter(r => Object.values(r).some(v => v !== ''));
+      if (!rows.length) { prev.innerHTML = '<span style="color:#dc2626">Arquivo vazio.</span>'; return; }
+      _avalImportCache = rows;
+      prev.innerHTML = `<span style="color:#15803d">✓ ${rows.length} respostas encontradas.</span>
+        <button class="ds-btn ds-btn-primary ds-btn-sm" style="margin-left:12px" onclick="abrirRevisaoAval()">Revisar e Importar</button>`;
+    } else {
+      // Excel com múltiplas abas — mostra seletor
+      const opts = wb.SheetNames.map(n => {
+        const count = (XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '' }).filter(r => Object.values(r).some(v => v !== ''))).length;
+        return `<option value="${n}">${n} (${count} respostas)</option>`;
+      }).join('');
+      prev.innerHTML = `
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:12px;color:#15803d;font-weight:600">✓ ${wb.SheetNames.length} abas encontradas. Selecione qual importar:</div>
+          <select class="ds-input" id="avalSheetSelect" style="width:360px" onchange="selecionarAbaAval(this.value)">
+            <option value="">— escolha a aba —</option>${opts}
+          </select>
+          <div id="avalSheetInfo" style="font-size:12px;color:#334155"></div>
+        </div>`;
+    }
   } catch(e) {
     prev.innerHTML = `<span style="color:#dc2626">Erro: ${e.message}</span>`;
   }
+}
+
+function selecionarAbaAval(sheetName) {
+  if (!sheetName || !window._avalWb) return;
+  const rows = XLSX.utils.sheet_to_json(window._avalWb.Sheets[sheetName], { defval: '' })
+                  .filter(r => Object.values(r).some(v => v !== ''));
+  _avalImportCache = rows;
+
+  // Auto-preenche tipo e nome da aba
+  const tipo = _detectTipoAba(sheetName);
+  const tipoEl = document.getElementById('avalImportTipo');
+  const abaEl  = document.getElementById('avalImportAba');
+  if (tipoEl) tipoEl.value = tipo;
+  if (abaEl)  abaEl.value  = sheetName;
+
+  const tipoLabel = tipo === 'principal' ? 'Líder avalia Time (80%)' : 'Time avalia Liderança (20%)';
+  document.getElementById('avalSheetInfo').innerHTML = rows.length
+    ? `<span style="color:#15803d">✓ ${rows.length} respostas · Tipo detectado: <strong>${tipoLabel}</strong></span>
+       <button class="ds-btn ds-btn-primary ds-btn-sm" style="margin-left:12px" onclick="abrirRevisaoAval()">Revisar e Importar</button>`
+    : `<span style="color:#dc2626">Aba vazia.</span>`;
 }
 
 function abrirRevisaoAval() {
