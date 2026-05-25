@@ -5786,7 +5786,9 @@ function _readWorkbook(file) {
 
 function _detectTipoAba(nome) {
   const n = nome.toLowerCase();
-  if (n.includes('liderança') || n.includes('lideranca') || n.includes('coo') || n.includes('supervisão') || n.includes('supervisao')) return 'secundario';
+  // "Liderança" e "COO" = liderado avalia o líder = peso 20%
+  if (n.includes('liderança') || n.includes('lideranca') || n.includes('coo')) return 'secundario';
+  // "Time", "Supervisão", "Senior", "Junior", "Estágio" = líder/supervisor avalia o time = peso 80%
   return 'principal';
 }
 
