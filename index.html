@@ -2751,7 +2751,7 @@ function _contarMovimentos(mes, ano) {
 }
 
 async function recalcularRotatividade() {
-  if (!allColabs.length) { showToast('Carregue os colaboradores primeiro.', true); return; }
+  if (!allColabs.length) { toast('Carregue os colaboradores primeiro.', true); return; }
   if (!confirm('Isso vai recalcular todos os meses com base nos colaboradores cadastrados, substituindo os valores de admissões e demissões. Continuar?')) return;
 
   // Coleta todos os meses com movimentação (admissão ou demissão)
@@ -2761,9 +2761,9 @@ async function recalcularRotatividade() {
     if (c.data_demissao) meses.add(c.data_demissao.slice(0, 7));
   });
 
-  if (!meses.size) { showToast('Nenhuma data de admissão ou demissão encontrada nos colaboradores.', true); return; }
+  if (!meses.size) { toast('Nenhuma data de admissão ou demissão encontrada nos colaboradores.', true); return; }
 
-  showToast('Recalculando...');
+  toast('Recalculando...');
   let ok = 0, erros = 0;
 
   for (const periodo of [...meses].sort()) {
@@ -2797,7 +2797,7 @@ async function recalcularRotatividade() {
   }
 
   await loadRot();
-  showToast(`Recalculado: ${ok} meses atualizados${erros ? ', ' + erros + ' erros' : ''}.`, erros > 0);
+  toast(`Recalculado: ${ok} meses atualizados${erros ? ', ' + erros + ' erros' : ''}.`, erros > 0);
 }
 
 function openRotModal() {
