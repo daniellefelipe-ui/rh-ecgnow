@@ -5809,11 +5809,8 @@ async function previewAvalImport(input) {
       prev.innerHTML = `<span style="color:#15803d">✓ ${rows.length} respostas encontradas.</span>
         <button class="ds-btn ds-btn-primary ds-btn-sm" style="margin-left:12px" onclick="abrirRevisaoAval()">Revisar e Importar</button>`;
     } else {
-      // Excel com múltiplas abas — mostra seletor
-      const opts = wb.SheetNames.map(n => {
-        const count = (XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '' }).filter(r => Object.values(r).some(v => v !== ''))).length;
-        return `<option value="${n}">${n} (${count} respostas)</option>`;
-      }).join('');
+      // Excel com múltiplas abas — lista só os nomes sem ler conteúdo
+      const opts = wb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
       prev.innerHTML = `
         <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
           <div style="font-size:12px;color:#15803d;font-weight:600">✓ ${wb.SheetNames.length} abas encontradas. Selecione qual importar:</div>
