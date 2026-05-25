@@ -5775,9 +5775,8 @@ function _readWorkbook(file) {
     const reader = new FileReader();
     reader.onload = e => {
       try {
-        const bytes = new Uint8Array(e.target.result);
-        const text  = new TextDecoder('utf-8').decode(bytes);
-        resolve(XLSX.read(text, { type: 'string', raw: false }));
+        const data = new Uint8Array(e.target.result);
+        resolve(XLSX.read(data, { type: 'array' }));
       } catch(err) { reject(err); }
     };
     reader.onerror = reject;
