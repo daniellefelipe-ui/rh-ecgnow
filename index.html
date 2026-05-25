@@ -393,6 +393,7 @@
             </select>
             <button class="ds-btn ds-btn-outline" onclick="document.getElementById('rotExcelInput').click()">📥 Importar Excel</button>
             <input type="file" id="rotExcelInput" accept=".xlsx,.xls" style="display:none" onchange="importRotExcel(this)">
+            <button class="ds-btn ds-btn-outline" onclick="recalcularRotatividade()" title="Recalcula todos os meses com base nos colaboradores cadastrados">🔄 Recalcular de Colaboradores</button>
             <button class="ds-btn ds-btn-primary" onclick="openRotModal()">+ Adicionar Mês</button>
           </div>
         </div>
@@ -2747,6 +2748,56 @@ function _contarMovimentos(mes, ano) {
   const adm = allColabs.filter(c => c.data_admissao >= ini && c.data_admissao <= fim).length;
   const dem = allColabs.filter(c => c.data_demissao >= ini && c.data_demissao <= fim).length;
   return { adm, dem };
+}
+
+async function recalcularRotatividade() {
+  if (!allColabs.length) { showToast('Carregue os colaboradores primeiro.', true); return; }
+  if (!confirm('Isso vai recalcular todos os meses com base nos colaboradores cadastrados, substituindo os valores de admissões e demissões. Continuar?')) return;
+
+  // Coleta todos os meses com movimentação (admissão ou demissão)
+  const meses = new Set();
+  allColabs.forEach(c => {
+    if (c.data_admissao) meses.add(c.data_admissao.slice(0, 7)); // YYYY-MM
+    if (c.data_demissao) meses.add(c.data_demissao.slice(0, 7));
+  });
+
+  if (!meses.size) { showToast('Nenhuma data de admissão ou demissão encontrada nos colaboradores.', true); return; }
+
+  showToast('Recalculando...');
+  let ok = 0, erros = 0;
+
+  for (const periodo of [...meses].sort()) {
+    const [ano, mes] = periodo.split('-');
+    const ini = `${ano}-${mes}-01`;
+    const fim = `${ano}-${mes}-31`;
+
+    const admissoes = allColabs.filter(c => c.data_admissao >= ini && c.data_admissao <= fim).length;
+    const demissoes = allColabs.filter(c => c.data_demissao >= ini && c.data_demissao <= fim).length;
+
+    // Total de colaboradores ativos no último dia daquele mês:
+    // admitidos até o fim do mês E (sem demissão OU demitidos depois do fim do mês)
+    const total = allColabs.filter(c => {
+      const admOk = c.data_admissao && c.data_admissao <= fim;
+      const demOk = !c.data_demissao || c.data_demissao > fim;
+      return admOk && demOk;
+    }).length;
+
+    const percentual = total > 0 ? parseFloat((((demissoes + admissoes) / 2) / total * 100).toFixed(2)) : 0;
+
+    try {
+      // Atualiza se já existe, cria se não existe
+      const snap = await db.collection('rotatividade').where('periodo', '==', periodo).limit(1).get();
+      if (!snap.empty) {
+        await snap.docs[0].ref.update({ admissoes, demissoes, total_colaboradores: total, percentual });
+      } else {
+        await db.collection('rotatividade').add({ periodo, admissoes, demissoes, total_colaboradores: total, percentual });
+      }
+      ok++;
+    } catch (e) { _logErr('recalcRot', e); erros++; }
+  }
+
+  await loadRot();
+  showToast(`Recalculado: ${ok} meses atualizados${erros ? ', ' + erros + ' erros' : ''}.`, erros > 0);
 }
 
 function openRotModal() {
