@@ -5864,14 +5864,27 @@ function abrirRevisaoAval() {
            kn.includes('nomedo') || kn.includes('avaliado') || kn.includes('avaliador') || kn.includes('cargo');
   };
   const questionCols = allKeys.filter(k => !isIdCol(k));
+
+  // Extrai valor numérico 1-5 de um campo — aceita número puro OU formato "4- Texto" do Google Forms
+  const _extrairNota = v => {
+    if (v === '' || v == null) return null;
+    const n = Number(v);
+    if (!isNaN(n) && n >= 1 && n <= 5) return n;
+    const m = String(v).match(/^([1-5])\s*[-–—]/);
+    return m ? Number(m[1]) : null;
+  };
+
   const numericCols  = questionCols.filter(k => {
     const vals = rows.map(r => r[k]).filter(v => v !== '' && v != null);
-    return vals.length > 0 && vals.every(v => { const n = Number(v); return !isNaN(n) && n >= 1 && n <= 5; });
+    return vals.length > 0 && vals.every(v => _extrairNota(v) !== null);
   });
   const discCols = questionCols.filter(k => !numericCols.includes(k));
 
   // Nota geral: coluna numérica que contém "nota geral"
   const notaGeralCol = numericCols.find(k => _normKey(k).includes('notageral') || _normKey(k).includes('notager'));
+
+  // Expor extrator para uso no confirmar
+  window._extrairNota = _extrairNota;
 
   const colabOpts = '<option value="">— nome livre —</option>' +
     allColabs.map(c => `<option value="${c.id}">${_esc(c.nome)}</option>`).join('');
@@ -5955,9 +5968,10 @@ async function confirmarImportacaoAval() {
       const avaliadorNome = document.getElementById(`aval-avaliador-nome-${i}`)?.value || '';
 
       const scores = {};
+      const _en = window._extrairNota || (v => { const n=Number(v); return (!isNaN(n)&&n>=1&&n<=5)?n:null; });
       numericCols.filter(k => k !== notaGeralCol).forEach(k => {
-        const v = Number(row[k]);
-        if (!isNaN(v)) scores[k] = v;
+        const v = _en(row[k]);
+        if (v !== null) scores[k] = v;
       });
 
       const dissertativas = {};
