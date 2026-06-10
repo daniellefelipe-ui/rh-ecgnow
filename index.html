@@ -5981,21 +5981,20 @@ async function confirmarImportacaoAval() {
         ? Object.values(scores).reduce((a,b) => a+b, 0) / Object.values(scores).length
         : null;
 
-      // Determina tipo por linha: se o avaliador é o líder direto do avaliado → principal (80%)
-      let tipoLinha = meta.tipo;
+      // Determina tipo por linha: avaliador é líder conhecido → principal (80%), senão → secundario (20%)
+      const _LIDERES = [
+        'barbara braga duarte de souza',
+        'bruno franciulli maia',
+        'marco antonio bustamante de lima',
+        'mayara luize almeida gomes silva',
+        'renner lariucci',
+        'vinicius pinto dos santos'
+      ];
+      let tipoLinha = 'secundario';
       if (avaliadorNome) {
-        const avaliado = allColabs.find(c => c.id === avaliadoId || (c.nome && c.nome.toLowerCase().trim() === avaliadoNome.toLowerCase().trim()));
-        if (avaliado && avaliado.lider) {
-          const liderNorm = avaliado.lider.toLowerCase().trim();
-          const avaliadorNorm = avaliadorNome.toLowerCase().trim();
-          // Verifica se o nome do avaliador está contido no nome do líder ou vice-versa
-          if (liderNorm.includes(avaliadorNorm) || avaliadorNorm.includes(liderNorm) ||
-              liderNorm.split(' ')[0] === avaliadorNorm.split(' ')[0]) {
-            tipoLinha = 'principal';
-          } else {
-            tipoLinha = 'secundario';
-          }
-        }
+        const avNorm = avaliadorNome.toLowerCase().trim();
+        const isLider = _LIDERES.some(l => l.includes(avNorm) || avNorm.includes(l) || l.split(' ')[0] === avNorm.split(' ')[0]);
+        if (isLider) tipoLinha = 'principal';
       }
 
       return {
