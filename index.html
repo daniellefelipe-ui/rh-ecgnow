@@ -5982,17 +5982,20 @@ async function confirmarImportacaoAval() {
         : null;
 
       // Determina tipo por linha: avaliador é líder conhecido → principal (80%), senão → secundario (20%)
+      const _semAcento = s => (s||'').toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g,'');
       const _LIDERES = [
-        'barbara braga duarte de souza',
-        'bruno franciulli maia',
-        'marco antonio bustamante de lima',
-        'mayara luize almeida gomes silva',
-        'renner lariucci',
-        'vinicius pinto dos santos'
-      ];
+        'barbara braga duarte de souza', 'barbara braga', 'barbara',
+        'bruno franciulli maia', 'bruno franciulli', 'bruno',
+        'marco antonio bustamante de lima', 'marco antonio bustamante', 'marco antonio', 'marco',
+        'mayara luize almeida gomes silva', 'mayara luize almeida gomes', 'mayara luize', 'mayara',
+        'renner lariucci', 'renner',
+        'vinicius pinto dos santos', 'vinicius pinto', 'vinicius',
+        'vinícius pinto dos santos', 'vinícius pinto', 'vinícius',
+        'bárbara braga duarte de souza', 'bárbara braga', 'bárbara'
+      ].map(_semAcento);
       let tipoLinha = 'secundario';
       if (avaliadorNome) {
-        const avNorm = avaliadorNome.toLowerCase().trim();
+        const avNorm = _semAcento(avaliadorNome);
         const isLider = _LIDERES.some(l => l.includes(avNorm) || avNorm.includes(l) || l.split(' ')[0] === avNorm.split(' ')[0]);
         if (isLider) tipoLinha = 'principal';
       }
