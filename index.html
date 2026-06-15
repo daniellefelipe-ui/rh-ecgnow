@@ -6036,112 +6036,215 @@ async function confirmarImportacaoAval() {
 
 // ── Resultados ─────────────────────────────────────────────
 let _avalCicloSelecionado = '2025';
+let _avalSetorFiltro = 'Todos';
+
+function _calcNotaAv(av) {
+  if (av.manual) return av.manual.nota_final;
+  const mP = av.principal?.length ? av.principal.reduce((s,r)=>s+(r.media_calculada||0),0)/av.principal.length : null;
+  const mS = av.secundario?.length ? av.secundario.reduce((s,r)=>s+(r.media_calculada||0),0)/av.secundario.length : null;
+  let n = null;
+  if (mP!=null && mS!=null) n = mP*0.8+mS*0.2;
+  else if (mP!=null) n = mP;
+  else if (mS!=null) n = mS;
+  av._pctPrinc = mP!=null ? mP/5*100 : null;
+  av._pctSec   = mS!=null ? mS/5*100 : null;
+  return n!=null ? n/5*100 : null;
+}
+
+function _notaColor(p) {
+  if (p==null) return '#94a3b8';
+  return p>=80?'#15803d':p>=75?'#0b4e7d':p>=60?'#b45309':'#b91c1c';
+}
+function _notaStatus(p) {
+  if (p==null) return '';
+  if (p>=80) return '<span class="ds-badge ds-badge-success">Acima da meta</span>';
+  if (p>=75) return '<span class="ds-badge ds-badge-info">Na meta</span>';
+  if (p>=60) return '<span class="ds-badge ds-badge-warning">Atenção</span>';
+  return '<span class="ds-badge ds-badge-danger">Crítico</span>';
+}
 
 function renderAvalResultados() {
   const cicloOpts = AVAL_CICLOS_FIXOS.map(c =>
     `<option value="${c.id}" ${c.id===_avalCicloSelecionado?'selected':''}>${_esc(c.nome)}</option>`).join('');
 
-  // Calcular resultados para o ciclo selecionado
   const respostasC = allAvalRespostas.filter(r => r.ciclo_id === _avalCicloSelecionado);
   const manuaisC   = allAvalManuais.filter(m => m.ciclo_id === _avalCicloSelecionado);
 
-  // Agrupar por avaliado
   const avaliadosMap = {};
-
   respostasC.forEach(r => {
-    const key = r.avaliado_id || r.avaliado_nome;
-    if (!key) return;
-    if (!avaliadosMap[key]) avaliadosMap[key] = {
-      nome: r.avaliado_nome, id: r.avaliado_id,
-      principal: [], secundario: []
-    };
-    if (r.tipo === 'principal') avaliadosMap[key].principal.push(r);
-    else avaliadosMap[key].secundario.push(r);
+    const key = r.avaliado_id || r.avaliado_nome; if (!key) return;
+    if (!avaliadosMap[key]) avaliadosMap[key] = { nome: r.avaliado_nome, id: r.avaliado_id, principal:[], secundario:[] };
+    avaliadosMap[key][r.tipo==='principal'?'principal':'secundario'].push(r);
   });
-
   manuaisC.forEach(m => {
-    const key = m.colaborador_id || m.colaborador_nome;
-    if (!key) return;
-    if (!avaliadosMap[key]) avaliadosMap[key] = {
-      nome: m.colaborador_nome, id: m.colaborador_id,
-      manual: m
-    };
-    else avaliadosMap[key].manual = m;
+    const key = m.colaborador_id || m.colaborador_nome; if (!key) return;
+    if (!avaliadosMap[key]) avaliadosMap[key] = { nome: m.colaborador_nome, id: m.colaborador_id };
+    avaliadosMap[key].manual = m;
   });
 
-  if (!Object.keys(avaliadosMap).length && !manuaisC.length) {
+  if (!Object.keys(avaliadosMap).length) {
     document.getElementById('avalWrap').innerHTML = `
-      <div style="margin-bottom:16px">
-        <select class="ds-search" style="width:120px" onchange="_avalCicloSelecionado=this.value;renderAvalResultados()">${cicloOpts}</select>
-      </div>
+      <div style="margin-bottom:16px"><select class="ds-search" style="width:120px" onchange="_avalCicloSelecionado=this.value;renderAvalResultados()">${cicloOpts}</select></div>
       <div class="ds-empty-state">Nenhuma avaliação encontrada para ${_avalCicloSelecionado}.</div>`;
     return;
   }
 
+  // Enriquecer com nota e setor
+  const avaliados = Object.values(avaliadosMap).map(av => {
+    av.pctFinal = _calcNotaAv(av);
+    const colab = allColabs.find(c => c.id===av.id || (c.nome&&c.nome.toLowerCase().trim()===(av.nome||'').toLowerCase().trim()));
+    av.setor = colab?.setor || 'Sem setor';
+    return av;
+  });
+
+  // Cards
+  const comNota  = avaliados.filter(a => a.pctFinal!=null);
+  const mediaGeral = comNota.length ? comNota.reduce((s,a)=>s+a.pctFinal,0)/comNota.length : 0;
+  const acima75  = comNota.filter(a => a.pctFinal>=75).length;
+  const abaixo75 = comNota.filter(a => a.pctFinal<75).length;
+  const pctAcima = comNota.length ? Math.round(acima75/comNota.length*100) : 0;
+
+  // Agrupamento por setor para gráfico
+  const setorMap = {};
+  avaliados.forEach(av => { if (!setorMap[av.setor]) setorMap[av.setor]=[]; setorMap[av.setor].push(av); });
+  const setores = Object.keys(setorMap).sort();
+  const setorMedias = setores.map(s => {
+    const ns = setorMap[s].filter(a=>a.pctFinal!=null).map(a=>a.pctFinal);
+    return ns.length ? Math.round(ns.reduce((a,b)=>a+b,0)/ns.length*10)/10 : 0;
+  });
+
+  // Filtro de setor para tabela
+  const setorFiltroOpts = ['Todos',...setores].map(s=>`<option value="${s}" ${s===_avalSetorFiltro?'selected':''}>${s}</option>`).join('');
+  const avalFiltrados = _avalSetorFiltro==='Todos' ? avaliados : avaliados.filter(a=>a.setor===_avalSetorFiltro);
+
   let rows = '';
-  Object.values(avaliadosMap).sort((a,b) => (a.nome||'').localeCompare(b.nome||'')).forEach(av => {
+  avalFiltrados.sort((a,b)=>(b.pctFinal||0)-(a.pctFinal||0)).forEach(av => {
+    const p = av.pctFinal;
+    const cor = _notaColor(p);
+    const status = _notaStatus(p);
     if (av.manual) {
-      // Avaliação manual (2023/2024)
-      const pdfLink = av.manual.pdf_url
-        ? `<a href="${av.manual.pdf_url}" target="_blank" class="ds-btn ds-btn-outline ds-btn-sm">📄 PDF</a>` : '—';
+      const pdfLink = av.manual.pdf_url?`<a href="${av.manual.pdf_url}" target="_blank" class="ds-btn ds-btn-outline ds-btn-sm">PDF</a>`:'—';
       rows += `<tr>
-        <td><b>${av.nome||'—'}</b></td>
-        <td style="text-align:center">—</td>
-        <td style="text-align:center">—</td>
-        <td style="text-align:center"><b style="font-size:16px;color:#0b4e7d">${av.manual.nota_final!=null?av.manual.nota_final.toFixed(1)+'%':'—'}</b></td>
-        <td style="text-align:center"><span class="ds-badge ds-badge-warning">Manual</span></td>
-        <td style="text-align:center">${pdfLink}</td>
+        <td><b>${_esc(av.nome||'—')}</b><div style="font-size:11px;color:#94a3b8">${_esc(av.setor)}</div></td>
+        <td style="text-align:center;color:#94a3b8">—</td>
+        <td style="text-align:center;color:#94a3b8">—</td>
+        <td style="text-align:center"><b style="font-size:16px;color:${cor}">${p!=null?p.toFixed(1)+'%':'—'}</b></td>
+        <td style="text-align:center">${status}</td>
+        <td style="text-align:center"><span class="ds-badge ds-badge-warning">Manual</span>${pdfLink}</td>
         <td style="text-align:center"><button class="ds-btn ds-btn-outline ds-btn-sm" onclick="openAvalManualModal('${av.manual.id}')">✏️</button></td>
       </tr>`;
     } else {
-      // Avaliação via Forms
-      const mediaPrinc = av.principal?.length
-        ? av.principal.reduce((s,r) => s+(r.media_calculada||0), 0) / av.principal.length : null;
-      const mediaSec = av.secundario?.length
-        ? av.secundario.reduce((s,r) => s+(r.media_calculada||0), 0) / av.secundario.length : null;
-
-      let notaFinal = null;
-      if (mediaPrinc != null && mediaSec != null)
-        notaFinal = mediaPrinc * 0.8 + mediaSec * 0.2;
-      else if (mediaPrinc != null) notaFinal = mediaPrinc;
-      else if (mediaSec != null) notaFinal = mediaSec;
-
-      const pctPrinc = mediaPrinc != null ? mediaPrinc / 5 * 100 : null;
-      const pctSec   = mediaSec   != null ? mediaSec   / 5 * 100 : null;
-      const pctFinal = notaFinal  != null ? notaFinal  / 5 * 100 : null;
-      const notaColor = pctFinal == null ? '#94a3b8' : pctFinal >= 80 ? '#15803d' : pctFinal >= 60 ? '#b45309' : '#b91c1c';
       rows += `<tr>
-        <td><b>${av.nome||'—'}</b></td>
-        <td style="text-align:center">${pctPrinc!=null?pctPrinc.toFixed(1)+'%':'—'} <span style="font-size:10px;color:#94a3b8">(${av.principal?.length||0})</span></td>
-        <td style="text-align:center">${pctSec!=null?pctSec.toFixed(1)+'%':'—'} <span style="font-size:10px;color:#94a3b8">(${av.secundario?.length||0})</span></td>
-        <td style="text-align:center"><b style="font-size:16px;color:${notaColor}">${pctFinal!=null?pctFinal.toFixed(1)+'%':'—'}</b></td>
+        <td><b>${_esc(av.nome||'—')}</b><div style="font-size:11px;color:#94a3b8">${_esc(av.setor)}</div></td>
+        <td style="text-align:center">${av._pctPrinc!=null?av._pctPrinc.toFixed(1)+'%':'—'} <span style="font-size:10px;color:#94a3b8">(${av.principal?.length||0})</span></td>
+        <td style="text-align:center">${av._pctSec!=null?av._pctSec.toFixed(1)+'%':'—'} <span style="font-size:10px;color:#94a3b8">(${av.secundario?.length||0})</span></td>
+        <td style="text-align:center"><b style="font-size:16px;color:${cor}">${p!=null?p.toFixed(1)+'%':'—'}</b></td>
+        <td style="text-align:center">${status}</td>
         <td style="text-align:center"><span class="ds-badge ds-badge-info">Forms</span></td>
-        <td style="text-align:center">—</td>
         <td style="text-align:center"><button class="ds-btn ds-btn-outline ds-btn-sm" onclick="verDetalheAval('${av.id||av.nome}','${_avalCicloSelecionado}')">🔍</button></td>
       </tr>`;
     }
   });
 
   document.getElementById('avalWrap').innerHTML = `
-    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
-      <select class="ds-search" style="width:120px" onchange="_avalCicloSelecionado=this.value;renderAvalResultados()">${cicloOpts}</select>
-      <span style="font-size:12px;color:#64748b">${Object.keys(avaliadosMap).length} colaborador(es) avaliado(s)</span>
+    <!-- Controles -->
+    <div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap">
+      <select class="ds-search" style="width:130px" onchange="_avalCicloSelecionado=this.value;renderAvalResultados()">${cicloOpts}</select>
       <button class="ds-btn ds-btn-outline ds-btn-sm" onclick="openAvalManualModal(null)">+ Avaliação Manual</button>
     </div>
-    <div style="overflow-x:auto">
-    <table class="ds-table">
-      <thead><tr>
-        <th>Colaborador</th>
-        <th style="text-align:center">Nota Principal <span style="font-weight:400;color:#94a3b8">(80%)</span></th>
-        <th style="text-align:center">Nota Secundária <span style="font-weight:400;color:#94a3b8">(20%)</span></th>
-        <th style="text-align:center">Nota Final</th>
-        <th style="text-align:center">Tipo</th>
-        <th style="text-align:center">PDF</th>
-        <th></th>
-      </tr></thead>
-      <tbody>${rows||'<tr><td colspan="7" class="ds-empty-state">Nenhum resultado.</td></tr>'}</tbody>
-    </table>
+
+    <!-- Cards resumo -->
+    <div class="ds-kpi-grid" style="margin-bottom:24px">
+      <div class="ds-kpi-card">
+        <div class="ds-kpi-lbl">Total Avaliados</div>
+        <div class="ds-kpi-val">${comNota.length}</div>
+      </div>
+      <div class="ds-kpi-card">
+        <div class="ds-kpi-lbl">Média Geral</div>
+        <div class="ds-kpi-val" style="color:${_notaColor(mediaGeral)}">${mediaGeral.toFixed(1)}%</div>
+      </div>
+      <div class="ds-kpi-card">
+        <div class="ds-kpi-lbl">Acima de 75%</div>
+        <div class="ds-kpi-val" style="color:#15803d">${acima75} <span style="font-size:13px;font-weight:400;color:#64748b">(${pctAcima}%)</span></div>
+      </div>
+      <div class="ds-kpi-card">
+        <div class="ds-kpi-lbl">Abaixo de 75%</div>
+        <div class="ds-kpi-val" style="color:#b91c1c">${abaixo75} <span style="font-size:13px;font-weight:400;color:#64748b">(${100-pctAcima}%)</span></div>
+      </div>
+    </div>
+
+    <!-- Gráfico por setor -->
+    <div class="ds-card" style="margin-bottom:24px;padding:20px">
+      <div style="font-weight:600;color:#0b4e7d;margin-bottom:16px">Média por Setor</div>
+      <div style="position:relative;height:${Math.max(180,setores.length*52)}px">
+        <canvas id="avalSetorChart"></canvas>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:16px;font-size:11px;color:#64748b">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#15803d;display:inline-block"></span>≥ 80%</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#0b4e7d;display:inline-block"></span>75–80%</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#b45309;display:inline-block"></span>60–75%</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#b91c1c;display:inline-block"></span>< 60%</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:20px;height:2px;background:#f59e0b;border-top:2px dashed #f59e0b;display:inline-block"></span>Meta 75%</span>
+      </div>
+    </div>
+
+    <!-- Ranking individual -->
+    <div class="ds-card" style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div style="font-weight:600;color:#0b4e7d">Ranking Individual</div>
+        <select class="ds-search" style="width:180px" onchange="_avalSetorFiltro=this.value;renderAvalResultados()">${setorFiltroOpts}</select>
+      </div>
+      <div style="overflow-x:auto">
+      <table class="ds-table">
+        <thead><tr>
+          <th>Colaborador</th>
+          <th style="text-align:center">Principal (80%)</th>
+          <th style="text-align:center">Secundária (20%)</th>
+          <th style="text-align:center">Nota Final</th>
+          <th style="text-align:center">Status</th>
+          <th style="text-align:center">Tipo</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rows||'<tr><td colspan="7" class="ds-empty-state">Nenhum resultado.</td></tr>'}</tbody>
+      </table>
+      </div>
     </div>`;
+
+  // Desenhar gráfico
+  setTimeout(() => {
+    const canvas = document.getElementById('avalSetorChart');
+    if (!canvas) return;
+    if (window._avalSetorChartInst) { window._avalSetorChartInst.destroy(); window._avalSetorChartInst = null; }
+    const cores = setorMedias.map(m => m>=80?'rgba(21,128,61,0.8)':m>=75?'rgba(11,78,125,0.8)':m>=60?'rgba(180,83,9,0.8)':'rgba(185,28,28,0.8)');
+    const refLine75 = {
+      id:'refLine',
+      afterDraw(chart) {
+        const {ctx:c2, scales:{x,y}} = chart;
+        const px = x.getPixelForValue(75);
+        c2.save();
+        c2.beginPath(); c2.moveTo(px,y.top); c2.lineTo(px,y.bottom);
+        c2.strokeStyle='#f59e0b'; c2.lineWidth=2; c2.setLineDash([6,3]); c2.stroke();
+        c2.fillStyle='#f59e0b'; c2.font='bold 10px sans-serif'; c2.fillText('75%',px+4,y.top+12);
+        c2.restore();
+      }
+    };
+    window._avalSetorChartInst = new Chart(canvas, {
+      type:'bar',
+      plugins:[refLine75],
+      data:{
+        labels: setores,
+        datasets:[{ data:setorMedias, backgroundColor:cores, borderRadius:6, borderSkipped:false }]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>' '+c.parsed.x.toFixed(1)+'%'}} },
+        scales:{
+          x:{ min:0, max:100, ticks:{callback:v=>v+'%'}, grid:{color:'#f1f5f9'} },
+          y:{ ticks:{font:{size:12}} }
+        }
+      }
+    });
+  }, 60);
 }
 
 function verDetalheAval(avaliadoKey, cicloId) {
