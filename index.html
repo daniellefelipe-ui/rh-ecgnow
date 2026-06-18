@@ -7367,7 +7367,12 @@ async function savePerfil() {
       let secondaryApp;
       try { secondaryApp = firebase.app('secondary'); } catch(e) { secondaryApp = firebase.initializeApp(firebaseConfig, 'secondary'); }
       const secAuth = secondaryApp.auth();
-      const cred = await secAuth.createUserWithEmailAndPassword(email, senha);
+      try {
+        await secAuth.createUserWithEmailAndPassword(email, senha);
+      } catch(err) {
+        if (err.code !== 'auth/email-already-in-use') throw err;
+        // Conta já existe no Firebase Auth — só salva o perfil
+      }
       await secAuth.signOut();
       await db.collection('perfis').add({ nome, email, role: 'lider', setor, colaborador_nome: colab, criado_em: new Date().toISOString() });
       toast('Usuário criado com sucesso!');
