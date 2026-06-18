@@ -4452,7 +4452,7 @@ function importFinExcel(input, tipoFixo) {
 let allFerPeriodos = [], allFerSolicita = [], allFerUsuarios = [];
 
 function _ferLideradosIds() {
-  if (_currentPerfil?.role !== 'lider') return null; // null = sem filtro
+  if (_currentPerfil?.role !== 'lider') return null; // null = sem filtro (admin vê tudo)
   const liderNome = (_currentPerfil.colaborador_nome || '').toLowerCase().trim();
   if (!liderNome) return null;
   return allColabs
