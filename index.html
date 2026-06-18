@@ -4463,13 +4463,21 @@ function _ferLideradosIds() {
 function _ferPerioodosFiltrados() {
   const ids = _ferLideradosIds();
   if (!ids) return allFerPeriodos;
-  return allFerPeriodos.filter(p => ids.includes(p.colaborador_id));
+  const nomes = allColabs.filter(c => ids.includes(c.id)).map(c => (c.nome||'').toLowerCase().trim());
+  return allFerPeriodos.filter(p =>
+    ids.includes(p.colaborador_id) ||
+    nomes.includes((p.colaborador_nome||'').toLowerCase().trim())
+  );
 }
 
 function _ferSolicitaFiltradas() {
   const ids = _ferLideradosIds();
   if (!ids) return allFerSolicita;
-  return allFerSolicita.filter(s => ids.includes(s.colaborador_id));
+  const nomes = allColabs.filter(c => ids.includes(c.id)).map(c => (c.nome||'').toLowerCase().trim());
+  return allFerSolicita.filter(s =>
+    ids.includes(s.colaborador_id) ||
+    nomes.includes((s.colaborador_nome||'').toLowerCase().trim())
+  );
 }
 let _ferTab = 'periodos';
 
