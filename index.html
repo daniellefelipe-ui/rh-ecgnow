@@ -4615,9 +4615,10 @@ function renderFerSolicitacoes() {
         <td><span class="ds-badge ${statusClass[s.status]||'ds-badge-info'}">${statusLabel[s.status]||s.status}</span></td>
         <td style="font-size:11px;color:#94a3b8">${dt}</td>
         <td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_esc(obs)}">${_esc(obs)||'—'}</td>
-        <td>${(s.status==='pendente'||s.status==='aprovado_lider')
-          ?`<button class="ds-btn ds-btn-sm ds-btn-primary" onclick="openSolicModal('${s.id}','rh')">Aprovar (RH)</button>`
-          :''}</td>
+        <td>${_currentPerfil?.role==='lider'
+          ? (s.status==='aprovado_rh' ? `<button class="ds-btn ds-btn-sm ds-btn-primary" onclick="openSolicModal('${s.id}','lider')">Aprovar</button>` : '')
+          : (s.status==='pendente'||s.status==='aprovado_lider' ? `<button class="ds-btn ds-btn-sm ds-btn-primary" onclick="openSolicModal('${s.id}','rh')">Aprovar (RH)</button>` : '')
+        }</td>
       </tr>`;
     }).join('')}</tbody></table>`;
 }
