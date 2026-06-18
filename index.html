@@ -225,20 +225,21 @@
     <div>
       <div class="ds-sb-label">Menu</div>
       <nav class="ds-sb-nav">
-        <button class="ds-nav-item active" onclick="showSection('dashboard',this)">🏠 &nbsp;Dashboard</button>
-        <button class="ds-nav-item"        onclick="showSection('colaboradores',this)">👤 &nbsp;Colaboradores</button>
-        <button class="ds-nav-item"        onclick="showSection('headcount',this)">💰 &nbsp;Headcount</button>
-        <button class="ds-nav-item" onclick="showSection('financeiro',this)">💵 &nbsp;Financeiro</button>
-        <button class="ds-nav-item" onclick="showSection('absenteismo',this)">📋 &nbsp;Absenteísmo</button>
-        <button class="ds-nav-item" onclick="showSection('rotatividade',this)">🔄 &nbsp;Rotatividade</button>
-        <button class="ds-nav-item" onclick="showSection('recrutamento',this)">🎯 &nbsp;Recrutamento</button>
-        <button class="ds-nav-item" onclick="showSection('treinamentos',this)">📚 &nbsp;Treinamentos</button>
-        <button class="ds-nav-item" onclick="showSection('enps',this)">💬 &nbsp;e-NPS</button>
-        <button class="ds-nav-item" onclick="showSection('esat',this)">⭐ &nbsp;e-SAT</button>
-        <button class="ds-nav-item" onclick="showSection('ferias',this)">🏖 &nbsp;Férias</button>
-        <button class="ds-nav-item" onclick="showSection('cargos',this)">📄 &nbsp;Cargos</button>
-        <button class="ds-nav-item" onclick="showSection('plano',this)">🗺️ &nbsp;Plano de Carreira</button>
-        <button class="ds-nav-item" onclick="showSection('avaliacao',this)">⭐ &nbsp;Avaliação de Desempenho</button>
+        <button class="ds-nav-item active" id="nav-dashboard"     onclick="showSection('dashboard',this)">🏠 &nbsp;Dashboard</button>
+        <button class="ds-nav-item"        id="nav-colaboradores" onclick="showSection('colaboradores',this)">👤 &nbsp;Colaboradores</button>
+        <button class="ds-nav-item"        id="nav-headcount"     onclick="showSection('headcount',this)">💰 &nbsp;Headcount</button>
+        <button class="ds-nav-item"        id="nav-financeiro"    onclick="showSection('financeiro',this)">💵 &nbsp;Financeiro</button>
+        <button class="ds-nav-item"        id="nav-absenteismo"   onclick="showSection('absenteismo',this)">📋 &nbsp;Absenteísmo</button>
+        <button class="ds-nav-item"        id="nav-rotatividade"  onclick="showSection('rotatividade',this)">🔄 &nbsp;Rotatividade</button>
+        <button class="ds-nav-item"        id="nav-recrutamento"  onclick="showSection('recrutamento',this)">🎯 &nbsp;Recrutamento</button>
+        <button class="ds-nav-item"        id="nav-treinamentos"  onclick="showSection('treinamentos',this)">📚 &nbsp;Treinamentos</button>
+        <button class="ds-nav-item"        id="nav-enps"          onclick="showSection('enps',this)">💬 &nbsp;e-NPS</button>
+        <button class="ds-nav-item"        id="nav-esat"          onclick="showSection('esat',this)">⭐ &nbsp;e-SAT</button>
+        <button class="ds-nav-item"        id="nav-ferias"        onclick="showSection('ferias',this)">🏖 &nbsp;Férias</button>
+        <button class="ds-nav-item"        id="nav-cargos"        onclick="showSection('cargos',this)">📄 &nbsp;Cargos</button>
+        <button class="ds-nav-item"        id="nav-plano"         onclick="showSection('plano',this)">🗺️ &nbsp;Plano de Carreira</button>
+        <button class="ds-nav-item"        id="nav-avaliacao"     onclick="showSection('avaliacao',this)">⭐ &nbsp;Avaliação de Desempenho</button>
+        <button class="ds-nav-item"        id="nav-usuarios"      onclick="showSection('usuarios',this)" style="display:none">👥 &nbsp;Usuários</button>
       </nav>
     </div>
     <div class="ds-sb-footer">
@@ -702,6 +703,17 @@
         <div id="planoWrap"><div class="ds-empty-state">Selecione uma aba acima.</div></div>
       </div>
     </section>
+
+    <!-- ══ USUÁRIOS ══════════════════════════════════════════ -->
+    <section class="page-section" id="sec-usuarios">
+      <div class="ds-page-header">
+        <h1>Usuários</h1>
+        <button class="ds-btn ds-btn-primary" onclick="openPerfilModal()">+ Novo Usuário</button>
+      </div>
+      <div class="ds-card">
+        <div id="usuariosWrap"><div class="ds-empty-state">Carregando...</div></div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -1149,6 +1161,19 @@
         <input type="text" class="ds-input" id="recProcesso" placeholder="Ex: Médico Analista de Holter">
       </div>
       <div class="ds-form-group">
+        <label class="ds-label">Setor *</label>
+        <select class="ds-select" id="recSetor">
+          <option value="">Selecione...</option>
+          <option value="TI">TI</option>
+          <option value="Financeiro">Financeiro</option>
+          <option value="Suporte ao Cliente">Suporte ao Cliente</option>
+          <option value="Comercial">Comercial</option>
+          <option value="Holter">Holter</option>
+          <option value="Administrativo">Administrativo</option>
+          <option value="Marketing">Marketing</option>
+        </select>
+      </div>
+      <div class="ds-form-group">
         <label class="ds-label">Data Inicial *</label>
         <input type="date" class="ds-input" id="recDataIni">
       </div>
@@ -1451,6 +1476,53 @@
   </div>
 </div>
 
+<!-- MODAL PERFIL USUÁRIO -->
+<div class="ds-modal-overlay" id="perfilModal">
+  <div class="ds-modal" style="width:500px">
+    <div class="ds-modal-header">
+      <span class="ds-modal-title" id="perfilModalTitle">Novo Usuário</span>
+      <button class="ds-modal-close" onclick="closePerfilModal()">×</button>
+    </div>
+    <input type="hidden" id="perfilId">
+    <div class="ds-form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px">
+      <div class="ds-form-group full" style="grid-column:1/-1">
+        <label class="ds-label">Nome completo *</label>
+        <input type="text" class="ds-input" id="perfilNome" placeholder="Ex: Marco Antonio Bustamante de Lima">
+      </div>
+      <div class="ds-form-group full" style="grid-column:1/-1">
+        <label class="ds-label">E-mail *</label>
+        <input type="email" class="ds-input" id="perfilEmail" placeholder="marco.lima@ecgnow.com.br">
+      </div>
+      <div class="ds-form-group" id="perfilSenhaGrp">
+        <label class="ds-label">Senha inicial *</label>
+        <input type="password" class="ds-input" id="perfilSenha" placeholder="Mínimo 6 caracteres">
+      </div>
+      <div class="ds-form-group">
+        <label class="ds-label">Setor</label>
+        <select class="ds-input" id="perfilSetor">
+          <option value="all">Todos (visão geral)</option>
+          <option value="TI">TI</option>
+          <option value="Financeiro">Financeiro</option>
+          <option value="Suporte ao Cliente">Suporte ao Cliente</option>
+          <option value="Comercial">Comercial</option>
+          <option value="Holter">Holter</option>
+          <option value="Administrativo">Administrativo</option>
+          <option value="Marketing">Marketing</option>
+        </select>
+      </div>
+      <div class="ds-form-group full" style="grid-column:1/-1">
+        <label class="ds-label">Nome do colaborador (para filtro de férias)</label>
+        <select class="ds-input" id="perfilColab"></select>
+      </div>
+    </div>
+    <div id="perfilModalMsg" style="font-size:12px;margin-top:10px;color:#b91c1c"></div>
+    <div class="ds-modal-footer">
+      <button class="ds-btn ds-btn-outline" onclick="closePerfilModal()">Cancelar</button>
+      <button class="ds-btn ds-btn-primary" id="perfilSaveBtn" onclick="savePerfil()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL AVALIAÇÃO MANUAL (2023/2024) -->
 <div class="ds-modal-overlay" id="avalManualModal">
   <div class="ds-modal" style="width:520px">
@@ -1691,31 +1763,57 @@ const storage = firebase.storage();
 // Sessão só dura enquanto o browser está aberto — fecha o browser, pede login de novo
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
-// ── Controle de acesso — e-mails autorizados no painel RH ──
-// Para adicionar outro administrador, inclua o e-mail nesta lista
-const ADMIN_EMAILS = [
-  'danielle.felipe@ecgnow.com.br'
-];
+// ── Controle de acesso ────────────────────────────────────
+const ADMIN_EMAILS = ['danielle.felipe@ecgnow.com.br'];
+let _currentPerfil = null;
 
 // ── Auth ──────────────────────────────────────────────────
 auth.onAuthStateChanged(async user => {
   if (user) {
-    if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-      await auth.signOut();
-      document.getElementById('loginPage').style.display = 'flex';
-      document.getElementById('appPage').style.display   = 'none';
-      document.getElementById('loginError').textContent  = 'Acesso não autorizado para este e-mail.';
-      return;
+    const email = user.email.toLowerCase();
+    if (ADMIN_EMAILS.includes(email)) {
+      _currentPerfil = { role: 'admin', email, nome: 'Admin' };
+    } else {
+      try {
+        const snap = await db.collection('perfis').where('email','==',email).limit(1).get();
+        if (snap.empty) {
+          await auth.signOut();
+          document.getElementById('loginError').textContent = 'Acesso não autorizado para este e-mail.';
+          return;
+        }
+        _currentPerfil = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      } catch(e) {
+        await auth.signOut();
+        document.getElementById('loginError').textContent = 'Erro ao carregar perfil.';
+        return;
+      }
     }
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('appPage').style.display  = 'flex';
-    document.getElementById('userEmail').textContent  = user.email;
+    applyUserProfile();
     loadAll();
   } else {
+    _currentPerfil = null;
     document.getElementById('loginPage').style.display = 'flex';
     document.getElementById('appPage').style.display   = 'none';
   }
 });
+
+function applyUserProfile() {
+  const p = _currentPerfil;
+  if (!p) return;
+  document.getElementById('userEmail').textContent = p.nome || p.email;
+  if (p.role === 'admin') {
+    document.getElementById('nav-usuarios').style.display = '';
+    return;
+  }
+  // Líder: mostra só Recrutamento e Férias
+  document.querySelectorAll('.ds-nav-item[id^="nav-"]').forEach(btn => {
+    const sec = btn.id.replace('nav-','');
+    btn.style.display = ['recrutamento','ferias'].includes(sec) ? '' : 'none';
+  });
+  showSection('recrutamento', document.getElementById('nav-recrutamento'));
+}
 
 async function login() {
   const email    = document.getElementById('loginEmail').value.trim();
@@ -1749,6 +1847,7 @@ function showSection(name, btn) {
   document.querySelectorAll('.ds-nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('sec-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
+  if (name === 'usuarios') loadUsuarios();
 }
 
 // ── Toast ─────────────────────────────────────────────────
@@ -2934,16 +3033,17 @@ async function loadRec() {
 }
 
 function renderRecKpis() {
-  const total      = allRec.length;
-  const finalizados= allRec.filter(r=>r.situacao==='Finalizado').length;
-  const cancelados = allRec.filter(r=>r.situacao==='Cancelado').length;
-  const emAndamento= allRec.filter(r=>r.situacao==='Em andamento').length;
-  const contratacoes = allRec.reduce((s,r)=>s+(r.contratacoes||0),0);
-  const duracoes   = allRec.filter(r=>r.duracao_dias>0).map(r=>r.duracao_dias);
+  const _rec    = _recVisiveis();
+  const total      = _rec.length;
+  const finalizados= _rec.filter(r=>r.situacao==='Finalizado').length;
+  const cancelados = _rec.filter(r=>r.situacao==='Cancelado').length;
+  const emAndamento= _rec.filter(r=>r.situacao==='Em andamento').length;
+  const contratacoes = _rec.reduce((s,r)=>s+(r.contratacoes||0),0);
+  const duracoes   = _rec.filter(r=>r.duracao_dias>0).map(r=>r.duracao_dias);
   const mediaDur   = duracoes.length ? (duracoes.reduce((a,b)=>a+b,0)/duracoes.length).toFixed(0) : '—';
-  const custos     = allRec.filter(r=>r.custo_por_contratacao>0).map(r=>r.custo_por_contratacao);
+  const custos     = _rec.filter(r=>r.custo_por_contratacao>0).map(r=>r.custo_por_contratacao);
   const mediaCusto = custos.length ? (custos.reduce((a,b)=>a+b,0)/custos.length).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—';
-  const curriculos = allRec.reduce((s,r)=>s+(r.curriculos_recebidos||0),0);
+  const curriculos = _rec.reduce((s,r)=>s+(r.curriculos_recebidos||0),0);
   document.getElementById('recKpis').innerHTML = `
     <div class="ds-kpi-card"><div class="ds-kpi-lbl">Total de Processos</div><div class="ds-kpi-val">${total}</div><div class="ds-kpi-sub">${finalizados} finalizados · ${emAndamento} em andamento</div></div>
     <div class="ds-kpi-card"><div class="ds-kpi-lbl">Contratações</div><div class="ds-kpi-val" style="color:#00a878">${contratacoes}</div><div class="ds-kpi-sub">${cancelados} processos cancelados</div></div>
@@ -2952,9 +3052,10 @@ function renderRecKpis() {
 }
 
 function renderRecCharts() {
+  const _rec = _recVisiveis();
   // Processos por mês
   const porMes = {};
-  allRec.forEach(r => {
+  _rec.forEach(r => {
     if (!r.data_inicial) return;
     const key = r.data_inicial.slice(0,7);
     porMes[key] = (porMes[key]||0) + 1;
@@ -2968,12 +3069,12 @@ function renderRecCharts() {
     options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ ticks:{ stepSize:1 } } } }
   });
   // Funil
-  const curriculos   = allRec.reduce((s,r)=>s+(r.curriculos_recebidos||0),0);
-  const triados      = allRec.reduce((s,r)=>s+(r.curriculos_triados||0),0);
-  const entrevistas  = allRec.reduce((s,r)=>s+(r.entrevistas_realizadas||0),0);
-  const testes       = allRec.reduce((s,r)=>s+(r.testes_praticos||0),0);
-  const gestor       = allRec.reduce((s,r)=>s+(r.entrevista_gestor||0),0);
-  const contratacoes = allRec.reduce((s,r)=>s+(r.contratacoes||0),0);
+  const curriculos   = _rec.reduce((s,r)=>s+(r.curriculos_recebidos||0),0);
+  const triados      = _rec.reduce((s,r)=>s+(r.curriculos_triados||0),0);
+  const entrevistas  = _rec.reduce((s,r)=>s+(r.entrevistas_realizadas||0),0);
+  const testes       = _rec.reduce((s,r)=>s+(r.testes_praticos||0),0);
+  const gestor       = _rec.reduce((s,r)=>s+(r.entrevista_gestor||0),0);
+  const contratacoes = _rec.reduce((s,r)=>s+(r.contratacoes||0),0);
   if (chartRecFunil) chartRecFunil.destroy();
   chartRecFunil = new Chart(document.getElementById('chartRecFunil'), {
     type:'bar',
@@ -2984,11 +3085,17 @@ function renderRecCharts() {
   });
 }
 
+function _recVisiveis() {
+  if (_currentPerfil?.role === 'lider' && _currentPerfil?.setor !== 'all')
+    return allRec.filter(r => r.setor === _currentPerfil.setor);
+  return allRec;
+}
+
 function renderRecTable() {
   const q   = (document.getElementById('recSearch')?.value||'').toLowerCase();
   const sit = document.getElementById('recFiltroSit')?.value||'';
   const ano = document.getElementById('recFiltroAno')?.value||'';
-  const lista = allRec.filter(r => {
+  const lista = _recVisiveis().filter(r => {
     if (sit && r.situacao !== sit) return false;
     if (ano && !(r.data_inicial||'').startsWith(ano)) return false;
     return !q || (r.processo||'').toLowerCase().includes(q);
@@ -3009,10 +3116,10 @@ function renderRecTable() {
     <td>${r.duracao_dias||'—'}${r.duracao_dias?' dias':''}</td>
     <td>${brl(r.custo_por_contratacao)}</td>
     <td><span class="ds-badge ${corSit(r.situacao)}">${r.situacao||'—'}</span></td>
-    <td><div style="display:flex;gap:6px">
+    <td>${_currentPerfil?.role==='admin'?`<div style="display:flex;gap:6px">
       <button class="ds-btn ds-btn-sm ds-btn-outline" onclick='editRec("${r.id}")'>Editar</button>
       <button class="ds-btn ds-btn-sm ds-btn-danger"  onclick='deleteRec("${r.id}")'>Excluir</button>
-    </div></td>
+    </div>`:''}</td>
   </tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -3052,6 +3159,7 @@ function editRec(id) {
   document.getElementById('recDataFim').value       = r.data_final||'';
   document.getElementById('recVagas').value         = r.num_vagas||'';
   document.getElementById('recSituacao').value      = r.situacao||'Em andamento';
+  document.getElementById('recSetor').value         = r.setor||'';
   document.getElementById('recCurriculos').value    = r.curriculos_recebidos||'';
   document.getElementById('recTriados').value       = r.curriculos_triados||'';
   document.getElementById('recEntrevistas').value   = r.entrevistas_realizadas||'';
@@ -3079,6 +3187,7 @@ async function saveRec() {
   const cont = parseFloat(document.getElementById('recContratacoes').value)||0;
   const payload = {
     processo,
+    setor:                 document.getElementById('recSetor').value||'',
     data_inicial:          document.getElementById('recDataIni').value||'',
     data_final:            document.getElementById('recDataFim').value||'',
     num_vagas:             parseInt(document.getElementById('recVagas').value)||1,
@@ -4341,6 +4450,27 @@ function importFinExcel(input, tipoFixo) {
 
 // ══ FÉRIAS ══════════════════════════════════════════════════
 let allFerPeriodos = [], allFerSolicita = [], allFerUsuarios = [];
+
+function _ferLideradosIds() {
+  if (_currentPerfil?.role !== 'lider') return null; // null = sem filtro
+  const liderNome = (_currentPerfil.colaborador_nome || '').toLowerCase().trim();
+  if (!liderNome) return null;
+  return allColabs
+    .filter(c => (c.lider||'').toLowerCase().trim().includes(liderNome.split(' ')[0]))
+    .map(c => c.id).filter(Boolean);
+}
+
+function _ferPerioodosFiltrados() {
+  const ids = _ferLideradosIds();
+  if (!ids) return allFerPeriodos;
+  return allFerPeriodos.filter(p => ids.includes(p.colaborador_id));
+}
+
+function _ferSolicitaFiltradas() {
+  const ids = _ferLideradosIds();
+  if (!ids) return allFerSolicita;
+  return allFerSolicita.filter(s => ids.includes(s.colaborador_id));
+}
 let _ferTab = 'periodos';
 
 const USUARIOS_PORTAL = [
@@ -4369,15 +4499,17 @@ async function loadFerias() {
 
 function buildFeriasKpis() {
   const hoje = new Date();
-  const pendentes = allFerSolicita.filter(s => s.status==='pendente' || s.status==='aprovado_rh').length;
-  const vencendo  = allFerPeriodos.filter(p => {
+  const _solicit = _ferSolicitaFiltradas();
+  const _periodos = _ferPerioodosFiltrados();
+  const pendentes = _solicit.filter(s => s.status==='pendente' || s.status==='aprovado_rh').length;
+  const vencendo  = _periodos.filter(p => {
     const diff = (new Date(p.data_limite+'T12:00:00') - hoje) / 86400000;
     const saldo = _calcSaldo(p).saldo;
     return diff >= 0 && diff <= 60 && saldo > 0;
   }).length;
-  const aprovados = allFerSolicita.filter(s => s.status==='aprovado_lider').length;
+  const aprovados = _solicit.filter(s => s.status==='aprovado_lider').length;
   document.getElementById('feriasKpis').innerHTML = `
-    <div class="ds-kpi-card"><div class="ds-kpi-lbl">Períodos Cadastrados</div><div class="ds-kpi-val">${allFerPeriodos.length}</div><div class="ds-kpi-sub">períodos aquisitivos</div></div>
+    <div class="ds-kpi-card"><div class="ds-kpi-lbl">Períodos Cadastrados</div><div class="ds-kpi-val">${_periodos.length}</div><div class="ds-kpi-sub">períodos aquisitivos</div></div>
     <div class="ds-kpi-card"><div class="ds-kpi-lbl">Aguard. Aprovação</div><div class="ds-kpi-val" style="color:${pendentes>0?'#b45309':'#071e34'}">${pendentes}</div><div class="ds-kpi-sub">solicitações pendentes</div></div>
     <div class="ds-kpi-card"><div class="ds-kpi-lbl">Vencendo em 60 dias</div><div class="ds-kpi-val" style="color:${vencendo>0?'#b91c1c':'#071e34'}">${vencendo}</div><div class="ds-kpi-sub">períodos com prazo próximo</div></div>
     <div class="ds-kpi-card"><div class="ds-kpi-lbl">Aprovadas (RH)</div><div class="ds-kpi-val">${aprovados}</div><div class="ds-kpi-sub">solicitações aprovadas</div></div>`;
@@ -4428,13 +4560,14 @@ function _badgeVence(dataLimite, saldo) {
 
 function renderFerPeriodos() {
   const wrap = document.getElementById('ferWrap');
-  if (!allFerPeriodos.length) {
+  const _periodos = _ferPerioodosFiltrados();
+  if (!_periodos.length) {
     wrap.innerHTML = `<div class="ds-empty-state">Nenhum período cadastrado.<br><small>Clique em "+ Adicionar Período" para começar.</small></div>`;
     return;
   }
   wrap.innerHTML = `<table class="ds-table">
     <thead><tr><th>Colaborador</th><th>Admissão</th><th>Período Aquisitivo</th><th>Data Limite</th><th>Direito</th><th>Gozado</th><th>Agendado</th><th>Saldo</th><th>Prazo</th><th></th></tr></thead>
-    <tbody>${allFerPeriodos.map(p => {
+    <tbody>${_periodos.map(p => {
       const {gozados,agendados,saldo} = _calcSaldo(p);
       return `<tr>
         <td><strong style="color:#1a2535">${_esc(p.colaborador_nome)}</strong></td>
@@ -4459,10 +4592,11 @@ function renderFerSolicitacoes() {
   const wrap = document.getElementById('ferWrap');
   const statusLabel = { pendente:'Aguard. RH', aprovado_rh:'Aguard. Líder', aprovado_lider:'Aprovada', reprovado_lider:'Reprovada (Líder)', reprovado_rh:'Reprovada (RH)' };
   const statusClass = { pendente:'ds-badge-warning', aprovado_lider:'ds-badge-info', aprovado_rh:'ds-badge-success', reprovado_lider:'ds-badge-danger', reprovado_rh:'ds-badge-danger' };
-  if (!allFerSolicita.length) { wrap.innerHTML = `<div class="ds-empty-state">Nenhuma solicitação encontrada.</div>`; return; }
+  const _solicit = _ferSolicitaFiltradas();
+  if (!_solicit.length) { wrap.innerHTML = `<div class="ds-empty-state">Nenhuma solicitação encontrada.</div>`; return; }
   wrap.innerHTML = `<table class="ds-table">
     <thead><tr><th>Colaborador</th><th>Período Solicitado</th><th>Dias</th><th>Tipo</th><th>Status</th><th>Data Solic.</th><th>Obs.</th><th></th></tr></thead>
-    <tbody>${allFerSolicita.map(s => {
+    <tbody>${_solicit.map(s => {
       const dt = s.criado_em?.toDate ? s.criado_em.toDate().toLocaleDateString('pt-BR') : '—';
       const obs = [s.obs_colaborador,s.obs_lider,s.obs_rh].filter(Boolean).join(' · ');
       return `<tr>
@@ -5992,7 +6126,7 @@ async function confirmarImportacaoAval() {
         'vinicius pinto dos santos', 'vinicius pinto', 'vinicius',
         'vinícius pinto dos santos', 'vinícius pinto', 'vinícius',
         'bárbara braga duarte de souza', 'bárbara braga', 'bárbara',
-        'roger lima moreira', 'roger lima', 'roger'
+        'rodrigo aramis da silva', 'rodrigo aramis', 'rodrigo'
       ].map(_semAcento);
       let tipoLinha = 'secundario';
       if (avaliadorNome) {
@@ -7136,6 +7270,128 @@ function ecgExportarExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Resultado ECG');
   XLSX.writeFile(wb, `resultado-ecg-${new Date().toISOString().slice(0,10)}.xlsx`);
   toast('Excel exportado!');
+}
+
+// ══ USUÁRIOS (PERFIS DE LÍDERES) ════════════════════════════
+let allPerfis = [];
+
+async function loadUsuarios() {
+  try {
+    const snap = await db.collection('perfis').get();
+    allPerfis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderUsuarios();
+  } catch(e) { _logErr('loadUsuarios', e); }
+}
+
+function renderUsuarios() {
+  const wrap = document.getElementById('usuariosWrap');
+  if (!allPerfis.length) {
+    wrap.innerHTML = `<div class="ds-empty-state">Nenhum usuário cadastrado. Clique em "+ Novo Usuário" para começar.</div>`;
+    return;
+  }
+  wrap.innerHTML = `<table class="ds-table">
+    <thead><tr><th>Nome</th><th>E-mail</th><th>Setor</th><th>Colaborador</th><th></th></tr></thead>
+    <tbody>${allPerfis.map(p => `<tr>
+      <td><b>${_esc(p.nome||'—')}</b></td>
+      <td style="font-size:12px;color:#64748b">${_esc(p.email||'—')}</td>
+      <td><span class="ds-badge ds-badge-info">${_esc(p.setor==='all'?'Todos':p.setor||'—')}</span></td>
+      <td style="font-size:12px">${_esc(p.colaborador_nome||'—')}</td>
+      <td style="white-space:nowrap">
+        <button class="ds-btn ds-btn-sm ds-btn-outline" onclick="editPerfil('${p.id}')">Editar</button>
+        <button class="ds-btn ds-btn-sm ds-btn-danger" onclick="deletePerfil('${p.id}')">Excluir</button>
+      </td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+function openPerfilModal() {
+  document.getElementById('perfilId').value    = '';
+  document.getElementById('perfilNome').value  = '';
+  document.getElementById('perfilEmail').value = '';
+  document.getElementById('perfilSenha').value = '';
+  document.getElementById('perfilSetor').value = 'all';
+  document.getElementById('perfilColab').value = '';
+  document.getElementById('perfilModalMsg').textContent = '';
+  document.getElementById('perfilSenhaGrp').style.display = '';
+  document.getElementById('perfilModalTitle').textContent = 'Novo Usuário';
+  const opts = '<option value="">— selecione —</option>' +
+    allColabs.map(c => `<option value="${_esc(c.nome||'')}">${_esc(c.nome||'')}</option>`).join('');
+  document.getElementById('perfilColab').innerHTML = opts;
+  document.getElementById('perfilModal').classList.add('open');
+}
+
+function editPerfil(id) {
+  const p = allPerfis.find(x => x.id === id); if (!p) return;
+  document.getElementById('perfilId').value    = p.id;
+  document.getElementById('perfilNome').value  = p.nome||'';
+  document.getElementById('perfilEmail').value = p.email||'';
+  document.getElementById('perfilSenha').value = '';
+  document.getElementById('perfilSetor').value = p.setor||'all';
+  document.getElementById('perfilModalMsg').textContent = '';
+  document.getElementById('perfilSenhaGrp').style.display = 'none';
+  document.getElementById('perfilModalTitle').textContent = 'Editar Usuário';
+  const opts = '<option value="">— selecione —</option>' +
+    allColabs.map(c => `<option value="${_esc(c.nome||'')}" ${c.nome===p.colaborador_nome?'selected':''}>${_esc(c.nome||'')}</option>`).join('');
+  document.getElementById('perfilColab').innerHTML = opts;
+  document.getElementById('perfilModal').classList.add('open');
+}
+
+function closePerfilModal() { document.getElementById('perfilModal').classList.remove('open'); }
+
+async function savePerfil() {
+  const id    = document.getElementById('perfilId').value;
+  const nome  = document.getElementById('perfilNome').value.trim();
+  const email = document.getElementById('perfilEmail').value.trim().toLowerCase();
+  const senha = document.getElementById('perfilSenha').value;
+  const setor = document.getElementById('perfilSetor').value;
+  const colab = document.getElementById('perfilColab').value;
+  const msg   = document.getElementById('perfilModalMsg');
+
+  if (!nome || !email) { msg.textContent = 'Nome e e-mail são obrigatórios.'; return; }
+
+  const btn = document.getElementById('perfilSaveBtn');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  msg.textContent = '';
+
+  try {
+    if (!id) {
+      // Novo usuário: cria conta no Firebase Auth via app secundário
+      if (!senha || senha.length < 6) { msg.textContent = 'Senha precisa ter no mínimo 6 caracteres.'; return; }
+      const firebaseConfig = {
+        apiKey: "AIzaSyBopJe43OvWuA-vuHWGCTqQ_ApreNf_kWA",
+        authDomain: "rh-ecgnow.firebaseapp.com",
+        projectId: "rh-ecgnow",
+        storageBucket: "rh-ecgnow.firebasestorage.app",
+        messagingSenderId: firebase.app().options.messagingSenderId,
+        appId: firebase.app().options.appId
+      };
+      let secondaryApp;
+      try { secondaryApp = firebase.app('secondary'); } catch(e) { secondaryApp = firebase.initializeApp(firebaseConfig, 'secondary'); }
+      const secAuth = secondaryApp.auth();
+      const cred = await secAuth.createUserWithEmailAndPassword(email, senha);
+      await secAuth.signOut();
+      await db.collection('perfis').add({ nome, email, role: 'lider', setor, colaborador_nome: colab, criado_em: new Date().toISOString() });
+      toast('Usuário criado com sucesso!');
+    } else {
+      await db.collection('perfis').doc(id).update({ nome, setor, colaborador_nome: colab });
+      toast('Usuário atualizado!');
+    }
+    closePerfilModal();
+    await loadUsuarios();
+  } catch(e) {
+    const erros = { 'auth/email-already-in-use': 'Este e-mail já possui uma conta.', 'auth/invalid-email': 'E-mail inválido.' };
+    msg.textContent = erros[e.code] || e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Salvar';
+  }
+}
+
+async function deletePerfil(id) {
+  if (!confirm('Excluir este usuário? A conta de acesso continuará existindo no Firebase — exclua-a manualmente se necessário.')) return;
+  try {
+    await db.collection('perfis').doc(id).delete();
+    toast('Usuário excluído.');
+    await loadUsuarios();
+  } catch(e) { toast('Erro ao excluir: ' + e.message, 'e'); }
 }
 
 </script>
