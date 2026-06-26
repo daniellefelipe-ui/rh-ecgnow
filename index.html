@@ -2458,13 +2458,14 @@ function importHcExcel(input) {
     const colIdade  = findCol(['idade']);
     const colTipo   = findCol(['pj','clt','tipo','contrato']);
     const colSal    = findCol(['salario bruto','salario','bruto']);
-    const colImp    = findCol(['impostos']) ;
+    // colImpF deve ser detectado ANTES de colImp para evitar match em "Impostos"
+    const colImpF   = findCol(['impostos ferias','impostos fer','ferias e 13','fer e 13','fér e 13']);
+    const colImp    = findCol(['impostos']);
     const colBen    = findCol(['beneficio']);
     const colVH     = findCol(['vale home','vale_home','home']);
     const colSeg    = findCol(['seguranca','segurança']);
     const colFer    = findCol(['ferias','férias']);
-    const col13     = findCol(['13']);
-    const colImpF   = findCol(['impostos ferias','impostos fér','impost']);
+    const col13     = findCol(['13º','13o','decimo','décimo','13 sal']);
     const colGW     = findCol(['gowork','posicao']);
     const colSaude  = findCol(['seguro saude','seguro saúde','saude','saúde']);
     if (!colNome) { toast('Coluna "Colaborador" não encontrada', 'e'); return; }
