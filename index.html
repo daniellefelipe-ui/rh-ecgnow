@@ -4217,31 +4217,44 @@ async function salvarVTCalculado() {
   const mes  = parseInt(document.getElementById('vtCalcMes')?.value);
   const ano  = parseInt(document.getElementById('vtCalcAno')?.value);
   const mesKey = FIN_MESES[mes];
-  // Colaboradores únicos do VT
-  const colabs = [...new Map(allFin.filter(r => r.tipo === 'vt').map(r => [r.colaborador_nome, r])).values()];
+  const somenteAtivos = document.getElementById('vtSomenteAtivos')?.checked ?? true;
+
+  // Usa o mesmo critério de deduplicação do calcVT: maior valor_dia por colaborador
+  const _colabMap = {};
+  allFin.filter(r => r.tipo === 'vt').forEach(r => {
+    const n = r.colaborador_nome;
+    if (!_colabMap[n] || (r.valor_dia||0) > (_colabMap[n].valor_dia||0)) _colabMap[n] = r;
+  });
+  let colabs = Object.values(_colabMap);
+  if (somenteAtivos) colabs = colabs.filter(r => /^ativ/i.test(getColabStatus(r.colaborador_nome)));
   if (!colabs.some(r => r.valor_dia > 0)) { toast('Defina o valor/dia de ao menos um colaborador','e'); return; }
+
   let ok = 0;
-  for (const r of colabs) {
-    const vd = r.valor_dia || 0;
-    if (!vd) continue;
-    const total_mes = parseFloat((vd * dias).toFixed(2));
-    // Encontra o registro do mesmo colaborador+ano ou cria novo
-    const reg = allFin.find(x => x.tipo === 'vt' && x.ano === ano && x.colaborador_nome === r.colaborador_nome);
-    if (reg) {
-      const upd = { [mesKey]: total_mes, valor_dia: vd };
-      // Recalcula total anual
-      const totalAnual = FIN_MESES.reduce((s,m) => s + (m === mesKey ? total_mes : (reg[m]||0)), 0);
-      upd.total = parseFloat(totalAnual.toFixed(2));
-      await db.collection('financeiro').doc(reg.id).update(upd);
-    } else {
-      const colab = allColabs.find(c => c.nome.toLowerCase().trim() === r.colaborador_nome.toLowerCase().trim());
-      const mesesObj = {}; FIN_MESES.forEach(m => { mesesObj[m] = m === mesKey ? total_mes : 0; });
-      await db.collection('financeiro').add({ tipo:'vt', colaborador_nome:r.colaborador_nome, colaborador_id:colab?colab.id:'', ano, valor_dia:vd, ...mesesObj, total:total_mes });
+  try {
+    for (const r of colabs) {
+      const vd = r.valor_dia || 0;
+      if (!vd) continue;
+      const total_mes = parseFloat((vd * dias).toFixed(2));
+      // Usa _normNome para evitar falhas por diferença de caixa/acento
+      const reg = allFin.find(x => x.tipo === 'vt' && x.ano === ano && _normNome(x.colaborador_nome) === _normNome(r.colaborador_nome));
+      if (reg) {
+        const upd = { [mesKey]: total_mes, valor_dia: vd };
+        const totalAnual = FIN_MESES.reduce((s,m) => s + (m === mesKey ? total_mes : (reg[m]||0)), 0);
+        upd.total = parseFloat(totalAnual.toFixed(2));
+        await db.collection('financeiro').doc(reg.id).update(upd);
+      } else {
+        const colab = allColabs.find(c => _normNome(c.nome) === _normNome(r.colaborador_nome));
+        const mesesObj = {}; FIN_MESES.forEach(m => { mesesObj[m] = m === mesKey ? total_mes : 0; });
+        await db.collection('financeiro').add({ tipo:'vt', colaborador_nome:r.colaborador_nome, colaborador_id:colab?colab.id:'', ano, valor_dia:vd, ...mesesObj, total:total_mes });
+      }
+      ok++;
     }
-    ok++;
-  }
-  toast(`VT de ${ok} colaborador(es) salvo para ${FIN_MESES_NOME[mes]}/${ano}!`);
-  await loadFin();
+    toast(`VT de ${ok} colaborador(es) salvo para ${FIN_MESES_NOME[mes]}/${ano}!`);
+    // Sincroniza filtro de ano da tabela financeiro para mostrar o que foi salvo
+    const filtroAno = document.getElementById('finAnoFilter');
+    if (filtroAno) filtroAno.value = String(ano);
+    await loadFin();
+  } catch(e) { toast('Erro ao salvar VT: ' + e.message, 'e'); }
 }
 
 function renderFinConsolidado() {
