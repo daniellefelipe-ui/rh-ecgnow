@@ -4619,8 +4619,8 @@ function _fmtDate(str) {
 }
 
 function _calcSaldo(periodo) {
-  const gozados   = allFerSolicita.filter(s => s.periodo_id===periodo.id && s.status==='aprovado_rh').reduce((a,s)=>a+(s.dias||0),0);
-  const agendados = allFerSolicita.filter(s => s.periodo_id===periodo.id && (s.status==='pendente'||s.status==='aprovado_lider')).reduce((a,s)=>a+(s.dias||0),0);
+  const gozados   = allFerSolicita.filter(s => s.periodo_id===periodo.id && s.status==='aprovado_lider').reduce((a,s)=>a+(s.dias||0),0);
+  const agendados = allFerSolicita.filter(s => s.periodo_id===periodo.id && (s.status==='pendente'||s.status==='aprovado_rh')).reduce((a,s)=>a+(s.dias||0),0);
   return { gozados, agendados, saldo: (periodo.dias_direito||30) - gozados - agendados };
 }
 
@@ -4684,7 +4684,7 @@ function renderFerSolicitacoes() {
         <td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_esc(obs)}">${_esc(obs)||'—'}</td>
         <td>${_currentPerfil?.role==='lider'
           ? (s.status==='aprovado_rh' ? `<button class="ds-btn ds-btn-sm ds-btn-primary" onclick="openSolicModal('${s.id}','lider')">Aprovar</button>` : '')
-          : (s.status==='pendente'||s.status==='aprovado_lider' ? `<button class="ds-btn ds-btn-sm ds-btn-primary" onclick="openSolicModal('${s.id}','rh')">Aprovar (RH)</button>` : '')
+          : (s.status==='pendente' ? `<button class="ds-btn ds-btn-sm ds-btn-primary" onclick="openSolicModal('${s.id}','rh')">Aprovar (RH)</button>` : '')
         }</td>
       </tr>`;
     }).join('')}</tbody></table>`;
